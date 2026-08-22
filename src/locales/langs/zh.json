@@ -221,6 +221,15 @@
     "outside": {
       "title": "内嵌页面"
     },
+    "cso": {
+      "title": "CSO经营管理",
+      "overview": "经营驾驶舱",
+      "partners": "CSO合作档案",
+      "partner360": "一户一档",
+      "ddi": "DDI归属工作台",
+      "evidence": "Evidence审核",
+      "settlement": "费用结算"
+    },
     "dashboard": {
       "title": "仪表盘",
       "console": "工作台",
