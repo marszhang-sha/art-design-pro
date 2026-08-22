@@ -221,6 +221,15 @@
     "outside": {
       "title": "Outside"
     },
+    "cso": {
+      "title": "CSO Operations",
+      "overview": "Operations Overview",
+      "partners": "CSO Profiles",
+      "partner360": "CSO 360",
+      "ddi": "DDI Attribution",
+      "evidence": "Evidence Review",
+      "settlement": "Settlement"
+    },
     "dashboard": {
       "title": "Dashboard",
       "console": "Console",

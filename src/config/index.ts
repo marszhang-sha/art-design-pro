@@ -38,7 +38,7 @@ import { headerBarConfig } from './modules/headerBar'
 const appConfig: SystemConfig = {
   // 系统信息
   systemInfo: {
-    name: 'Art Design Pro' // 系统名称
+    name: 'CSO经营管理平台' // 系统名称
   },
   // 系统主题
   systemThemeStyles: {
@@ -118,7 +118,7 @@ const appConfig: SystemConfig = {
   ],
   // 系统主色
   systemMainColor: [
-    '#5D87FF',
+    '#1768E5',
     '#B48DF3',
     '#1D84FF',
     '#60C041',
