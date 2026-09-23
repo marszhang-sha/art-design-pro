@@ -9,13 +9,23 @@ import { resultRoutes } from './result'
 import { exceptionRoutes } from './exception'
 import { safeguardRoutes } from './safeguard'
 import { helpRoutes } from './help'
-import { csoRoutes } from './cso'
+import {
+  csoRelationshipRoutes,
+  csoMarketRoutes,
+  csoExecutionRoutes,
+  csoPerformanceRoutes,
+  csoInsightRoutes
+} from './cso'
 
 /**
  * 导出所有模块化路由
  */
 export const routeModules: AppRouteRecord[] = [
-  csoRoutes,
+  csoRelationshipRoutes,
+  csoMarketRoutes,
+  csoExecutionRoutes,
+  csoPerformanceRoutes,
+  csoInsightRoutes,
   dashboardRoutes,
   templateRoutes,
   widgetsRoutes,

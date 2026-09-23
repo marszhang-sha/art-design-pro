@@ -1,24 +1,35 @@
 import { AppRouteRecord } from '@/types/router'
 
-export const csoRoutes: AppRouteRecord = {
-  name: 'CsoManagement',
-  path: '/cso',
+const moduleRoles = ['R_SUPER', 'R_ADMIN']
+
+export const csoRelationshipRoutes: AppRouteRecord = {
+  name: 'CsoRelationship',
+  path: '/cso/relationship',
   component: '/index/index',
   meta: {
-    title: 'menus.cso.title',
-    icon: 'ri:building-2-line',
-    roles: ['R_SUPER', 'R_ADMIN']
+    title: 'menus.cso.relationship',
+    icon: 'ri:links-line',
+    roles: moduleRoles
   },
   children: [
     {
-      path: 'overview',
-      name: 'CsoOverview',
-      component: '/cso/overview',
+      path: 'onboarding',
+      name: 'CsoOnboarding',
+      component: '/cso/onboarding',
       meta: {
-        title: 'menus.cso.overview',
-        icon: 'ri:dashboard-3-line',
-        keepAlive: false,
-        fixedTab: true
+        title: 'menus.cso.onboarding',
+        icon: 'ri:user-shared-line',
+        keepAlive: false
+      }
+    },
+    {
+      path: 'contracts',
+      name: 'CsoContracts',
+      component: '/cso/contracts',
+      meta: {
+        title: 'menus.cso.contracts',
+        icon: 'ri:file-paper-2-line',
+        keepAlive: false
       }
     },
     {
@@ -42,12 +53,101 @@ export const csoRoutes: AppRouteRecord = {
       }
     },
     {
+      path: 'representatives',
+      name: 'CsoRepresentatives',
+      component: '/cso/representatives',
+      meta: {
+        title: 'menus.cso.representatives',
+        icon: 'ri:group-line',
+        keepAlive: false
+      }
+    }
+  ]
+}
+
+export const csoMarketRoutes: AppRouteRecord = {
+  name: 'CsoMarket',
+  path: '/cso/market',
+  component: '/index/index',
+  meta: {
+    title: 'menus.cso.market',
+    icon: 'ri:store-2-line',
+    roles: moduleRoles
+  },
+  children: [
+    {
+      path: 'roadmap',
+      name: 'CsoMarketRoadmap',
+      component: '/cso/roadmap',
+      meta: {
+        title: 'menus.cso.marketRoadmap',
+        icon: 'ri:road-map-line',
+        keepAlive: false
+      }
+    }
+  ]
+}
+
+export const csoExecutionRoutes: AppRouteRecord = {
+  name: 'CsoExecution',
+  path: '/cso/execution',
+  component: '/index/index',
+  meta: {
+    title: 'menus.cso.execution',
+    icon: 'ri:run-line',
+    roles: moduleRoles
+  },
+  children: [
+    {
+      path: 'roadmap',
+      name: 'CsoExecutionRoadmap',
+      component: '/cso/roadmap',
+      meta: {
+        title: 'menus.cso.executionRoadmap',
+        icon: 'ri:road-map-line',
+        keepAlive: false
+      }
+    }
+  ]
+}
+
+export const csoPerformanceRoutes: AppRouteRecord = {
+  name: 'CsoPerformance',
+  path: '/cso/performance',
+  component: '/index/index',
+  meta: {
+    title: 'menus.cso.performance',
+    icon: 'ri:bar-chart-box-line',
+    roles: moduleRoles
+  },
+  children: [
+    {
       path: 'ddi',
       name: 'CsoDdi',
       component: '/cso/ddi',
       meta: {
         title: 'menus.cso.ddi',
         icon: 'ri:flow-chart',
+        keepAlive: false
+      }
+    },
+    {
+      path: 'sales-confirm',
+      name: 'CsoSalesConfirm',
+      component: '/cso/sales-confirm',
+      meta: {
+        title: 'menus.cso.salesConfirm',
+        icon: 'ri:checkbox-multiple-line',
+        keepAlive: false
+      }
+    },
+    {
+      path: 'rebate',
+      name: 'CsoRebate',
+      component: '/cso/rebate',
+      meta: {
+        title: 'menus.cso.rebate',
+        icon: 'ri:calculator-line',
         keepAlive: false
       }
     },
@@ -69,6 +169,30 @@ export const csoRoutes: AppRouteRecord = {
         title: 'menus.cso.settlement',
         icon: 'ri:funds-box-line',
         keepAlive: false
+      }
+    }
+  ]
+}
+
+export const csoInsightRoutes: AppRouteRecord = {
+  name: 'CsoInsight',
+  path: '/cso/insight',
+  component: '/index/index',
+  meta: {
+    title: 'menus.cso.insight',
+    icon: 'ri:lightbulb-flash-line',
+    roles: moduleRoles
+  },
+  children: [
+    {
+      path: 'overview',
+      name: 'CsoOverview',
+      component: '/cso/overview',
+      meta: {
+        title: 'menus.cso.overview',
+        icon: 'ri:dashboard-3-line',
+        keepAlive: false,
+        fixedTab: true
       }
     }
   ]

@@ -222,13 +222,24 @@
       "title": "内嵌页面"
     },
     "cso": {
-      "title": "CSO经营管理",
-      "overview": "经营驾驶舱",
-      "partners": "CSO合作档案",
+      "relationship": "01 合作关系管理",
+      "onboarding": "准入管理",
+      "contracts": "合同管理",
+      "partners": "CSO档案",
       "partner360": "一户一档",
+      "representatives": "代表管理",
+      "market": "02 市场与资源管理",
+      "marketRoadmap": "市场与资源规划",
+      "execution": "03 业务执行管理",
+      "executionRoadmap": "业务执行规划",
+      "performance": "04 业绩与结算管理",
       "ddi": "DDI归属工作台",
+      "salesConfirm": "销量确认与异议",
+      "rebate": "返利计算",
       "evidence": "Evidence审核",
-      "settlement": "费用结算"
+      "settlement": "结算支付",
+      "insight": "05 经营洞察",
+      "overview": "经营驾驶舱"
     },
     "dashboard": {
       "title": "仪表盘",

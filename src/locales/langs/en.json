@@ -222,13 +222,24 @@
       "title": "Outside"
     },
     "cso": {
-      "title": "CSO Operations",
-      "overview": "Operations Overview",
+      "relationship": "01 Collaboration",
+      "onboarding": "Admission",
+      "contracts": "Contracts",
       "partners": "CSO Profiles",
       "partner360": "CSO 360",
+      "representatives": "Representatives",
+      "market": "02 Market & Resources",
+      "marketRoadmap": "Market Roadmap",
+      "execution": "03 Execution",
+      "executionRoadmap": "Execution Roadmap",
+      "performance": "04 Performance & Settlement",
       "ddi": "DDI Attribution",
+      "salesConfirm": "Confirm & Disputes",
+      "rebate": "Rebate Calculation",
       "evidence": "Evidence Review",
-      "settlement": "Settlement"
+      "settlement": "Settlement",
+      "insight": "05 Insight",
+      "overview": "Operations Overview"
     },
     "dashboard": {
       "title": "Dashboard",
