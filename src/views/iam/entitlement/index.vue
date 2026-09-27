@@ -213,10 +213,11 @@
           { type: 'info' }
         )
       }
-      await iamEntitlementApi.grant(agentId.value, {
-        permissionIds: grantMode.value === 'MANUAL' ? manualPermIds.value : undefined,
-        templateId: grantMode.value === 'TEMPLATE' ? grantTemplateId.value! : undefined
-      })
+      const payload =
+        grantMode.value === 'TEMPLATE'
+          ? { templateId: grantTemplateId.value as number }
+          : { permissionIds: manualPermIds.value }
+      await iamEntitlementApi.grant(agentId.value, payload)
       ElMessage.success('已授予')
       manualPermIds.value = []
       grantTemplateId.value = null
