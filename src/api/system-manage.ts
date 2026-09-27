@@ -60,6 +60,9 @@ export function fetchGetMenuList() {
   }
 
   return request
-    .get<IamMenuNode[]>({ url: '/api/v1/me/menus' })
-    .then((roots) => (Array.isArray(roots) ? roots.map((root) => toRecord(root)) : []))
+    .get<{ menus: IamMenuNode[] } | IamMenuNode[]>({ url: '/api/v1/me/menus' })
+    .then((resp) => {
+      const roots = Array.isArray(resp) ? resp : resp?.menus
+      return Array.isArray(roots) ? roots.map((root) => toRecord(root)) : []
+    })
 }
