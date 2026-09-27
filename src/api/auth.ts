@@ -18,12 +18,20 @@ export function fetchLogin(params: Api.Auth.LoginParams) {
  * 获取用户信息
  * @returns 用户信息
  */
-export function fetchGetUserInfo() {
-  return request.get<Api.Auth.UserInfo>({
-    url: '/api/user/info'
-    // 自定义请求头
-    // headers: {
-    //   'X-Custom-Header': 'your-custom-value'
-    // }
-  })
+export async function fetchGetUserInfo() {
+  // IAM 对接：/me → 框架 UserInfo 形状
+  const raw = await request.get<{
+    id: string
+    username: string
+    email: string | null
+    accountType: string
+  }>({ url: '/api/v1/me' })
+
+  return {
+    userId: Number(raw.id),
+    userName: raw.username,
+    email: raw.email ?? '',
+    buttons: [] as string[],
+    roles: [] as string[]
+  } as Api.Auth.UserInfo
 }

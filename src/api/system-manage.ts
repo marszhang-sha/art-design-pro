@@ -17,9 +17,49 @@ export function fetchGetRoleList(params: Api.SystemManage.RoleSearchParams) {
   })
 }
 
-// 获取菜单列表
+// 获取菜单列表（IAM /me/menus → AppRouteRecord；后端已按权限过滤，默认 HIDE）
 export function fetchGetMenuList() {
-  return request.get<AppRouteRecord[]>({
-    url: '/api/v3/system/menus'
-  })
+  interface IamMenuNode {
+    id: number
+    code: string
+    name: string
+    parentId: number | null
+    route: string | null
+    authList?: { title: string; authMark: string }[]
+    children: IamMenuNode[]
+  }
+
+  // 递归转换：带 route 的视为页面（component=route+index）；目录节点挂布局；
+  // 按钮不转路由，已由后端折叠进父页面 meta.authList（v-auth 按钮权限载体）
+  const toRecord = (node: IamMenuNode): AppRouteRecord => {
+    const meta = {
+      title: node.name,
+      keepAlive: true,
+      authList: node.authList ?? []
+    }
+    const children = (node.children ?? []).map((child) => toRecord(child, false))
+
+    if (node.route) {
+      return {
+        name: node.code,
+        path: node.route,
+        component: `${node.route}/index`,
+        meta,
+        ...(children.length ? { children: children.filter((c) => c.path !== node.route) } : {})
+      }
+    }
+
+    // 目录节点（无 route）：挂布局组件，children 为组内页面
+    return {
+      name: node.code,
+      path: `/${node.code}`,
+      component: '/index/index',
+      meta,
+      children
+    }
+  }
+
+  return request
+    .get<IamMenuNode[]>({ url: '/api/v1/me/menus' })
+    .then((roots) => (Array.isArray(roots) ? roots.map((root) => toRecord(root)) : []))
 }
