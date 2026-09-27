@@ -37,7 +37,7 @@ export function fetchGetMenuList() {
       keepAlive: true,
       authList: node.authList ?? []
     }
-    const children = (node.children ?? []).map((child) => toRecord(child, false))
+    const children = (node.children ?? []).map((child) => toRecord(child))
 
     if (node.route) {
       return {
