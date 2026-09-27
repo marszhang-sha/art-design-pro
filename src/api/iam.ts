@@ -28,7 +28,9 @@ export interface IamLoginResponse {
   accessToken: string
   refreshToken: string
   expiresIn: number
-  account: Pick<IamAccount, 'id' | 'username' | 'accountType' | 'agentId'>
+  account: Pick<IamAccount, 'id' | 'username' | 'accountType' | 'agentId'> & {
+    mustChangePassword: boolean
+  }
 }
 
 export interface IamPermission {
