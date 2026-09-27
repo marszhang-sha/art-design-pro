@@ -112,7 +112,7 @@
   import { useUserStore } from '@/store/modules/user'
   import { useI18n } from 'vue-i18n'
   import { HttpError } from '@/utils/http/error'
-  import { fetchLogin } from '@/api/auth'
+  import { iamAuthApi } from '@/api/iam'
   import { ElNotification, type FormInstance, type FormRules } from 'element-plus'
   import { useSettingStore } from '@/store/modules/setting'
 
@@ -216,25 +216,28 @@
 
       loading.value = true
 
-      // 登录请求
+      // 登录请求（IAM：/api/v1/auth/login）
       const { username, password } = formData
 
-      const { token, refreshToken } = await fetchLogin({
-        userName: username,
-        password
-      })
+      const resp = await iamAuthApi.login(username, password)
+      const { accessToken, refreshToken, account } = resp
 
-      // 验证token
-      if (!token) {
+      if (!accessToken) {
         throw new Error('Login failed - no token received')
       }
 
       // 存储 token 和登录状态
-      userStore.setToken(token, refreshToken)
+      userStore.setToken(accessToken, refreshToken)
       userStore.setLoginStatus(true)
 
       // 登录成功处理
       showLoginSuccessNotice()
+
+      // 首登强制改密（管理员重置/开户初始态）
+      if (account.mustChangePassword) {
+        router.push('/iam/self-password')
+        return
+      }
 
       // 获取 redirect 参数，如果存在则跳转到指定页面，否则跳转到首页
       const redirect = route.query.redirect as string
