@@ -27,8 +27,8 @@ import { $t } from '@/locales'
 
 // 错误响应接口
 export interface ErrorResponse {
-  /** 错误状态码 */
-  code: number
+  /** 错误码：HTTP 状态码或 IAM 业务码（IAM-xxxx） */
+  code: number | string
   /** 错误消息 */
   msg: string
   /** 错误附加数据 */
@@ -37,8 +37,8 @@ export interface ErrorResponse {
 
 // 错误日志数据接口
 export interface ErrorLogData {
-  /** 错误状态码 */
-  code: number
+  /** 错误码：HTTP 状态码或 IAM 业务码 */
+  code: number | string
   /** 错误消息 */
   message: string
   /** 错误附加数据 */
@@ -55,7 +55,8 @@ export interface ErrorLogData {
 
 // 自定义 HttpError 类
 export class HttpError extends Error {
-  public readonly code: number
+  /** 业务码：HTTP 状态码（数值）或 IAM 业务码（字符串，如 IAM-1001） */
+  public readonly code: number | string
   public readonly data?: unknown
   public readonly timestamp: string
   public readonly url?: string
@@ -63,7 +64,7 @@ export class HttpError extends Error {
 
   constructor(
     message: string,
-    code: number,
+    code: number | string,
     options?: {
       data?: unknown
       url?: string

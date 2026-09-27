@@ -4,11 +4,12 @@
  *
  * ## 主要功能
  *
- * - 请求/响应拦截器（自动添加 Token、统一错误处理）
+ * - 请求/响应拦截器（自动添加 Bearer Token、统一错误处理）
+ * - 双模式响应：框架信封（code/msg/data）与 IAM 原始载荷（RFC 7807 错误）
  * - 401 未授权自动登出（带防抖机制）
+ * - IAM-1006 → /auth/refresh 单飞刷新并重放一次（002-4 轮换令牌）
  * - 请求失败自动重试（可配置）
  * - 统一的成功/错误消息提示
- * - 支持 GET/POST/PUT/DELETE 等常用方法
  *
  * @module utils/http
  * @author Art Design Pro Team
@@ -36,6 +37,8 @@ let unauthorizedTimer: NodeJS.Timeout | null = null
 interface ExtendedAxiosRequestConfig extends AxiosRequestConfig {
   showErrorMessage?: boolean
   showSuccessMessage?: boolean
+  /** 内部标记：刷新重放请求（不再二次刷新） */
+  _isRefreshRetry?: boolean
 }
 
 const { VITE_API_URL, VITE_WITH_CREDENTIALS } = import.meta.env
@@ -61,11 +64,28 @@ const axiosInstance = axios.create({
   ]
 })
 
+/** 判定是否框架信封响应（{code:number, msg, data}） */
+function isEnvelope(data: unknown): data is BaseResponse {
+  return (
+    !!data &&
+    typeof data === 'object' &&
+    'code' in data &&
+    typeof (data as BaseResponse).code === 'number' &&
+    'msg' in data
+  )
+}
+
 /** 请求拦截器 */
 axiosInstance.interceptors.request.use(
   (request: InternalAxiosRequestConfig) => {
     const { accessToken } = useUserStore()
-    if (accessToken) request.headers.set('Authorization', accessToken)
+    if (accessToken) {
+      // 后端要求 Bearer 方案；兼容历史存储的裸令牌
+      request.headers.set(
+        'Authorization',
+        accessToken.startsWith('Bearer ') ? accessToken : `Bearer ${accessToken}`
+      )
+    }
 
     if (request.data && !(request.data instanceof FormData) && !request.headers['Content-Type']) {
       request.headers.set('Content-Type', 'application/json')
@@ -82,20 +102,41 @@ axiosInstance.interceptors.request.use(
 
 /** 响应拦截器 */
 axiosInstance.interceptors.response.use(
-  (response: AxiosResponse<BaseResponse>) => {
-    const { code, msg } = response.data
-    if (code === ApiStatus.success) return response
-    if (code === ApiStatus.unauthorized) handleUnauthorizedError(msg)
-    throw createHttpError(msg || $t('httpMsg.requestFailed'), code)
+  (response: AxiosResponse) => {
+    const data = response.data
+    // 框架信封模式（既有 mock/示例接口）
+    if (isEnvelope(data)) {
+      const { code, msg } = data
+      if (code === ApiStatus.success) return response
+      if (code === ApiStatus.unauthorized) handleUnauthorizedError(msg)
+      throw createHttpError(msg || $t('httpMsg.requestFailed'), code)
+    }
+    // IAM 原始载荷：HTTP 2xx 即成功
+    return response
   },
-  (error) => {
-    if (error.response?.status === ApiStatus.unauthorized) handleUnauthorizedError()
+  async (error) => {
+    const status: number | undefined = error.response?.status
+
+    // 401 → 单飞刷新并重放一次（002-4）；刷新请求自身不再刷新
+    if (
+      status === ApiStatus.unauthorized &&
+      !error.config?._isRefreshRetry &&
+      error.config?.url !== '/api/v1/auth/refresh'
+    ) {
+      const refreshed = await refreshSingleFlight()
+      if (refreshed) {
+        return axiosInstance.request({ ...error.config, _isRefreshRetry: true })
+      }
+      return Promise.reject(handleError(error))
+    }
+
+    if (status === ApiStatus.unauthorized) handleUnauthorizedError()
     return Promise.reject(handleError(error))
   }
 )
 
 /** 统一创建HttpError */
-function createHttpError(message: string, code: number) {
+function createHttpError(message: string, code: number | string) {
   return new HttpError(message, code)
 }
 
@@ -130,6 +171,37 @@ function logOut() {
   }, LOGOUT_DELAY)
 }
 
+/** 刷新单飞：并发 401 仅触发一次 /auth/refresh（002-4 轮换） */
+let refreshInFlight: Promise<boolean> | null = null
+
+function refreshSingleFlight(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefresh().finally(() => {
+      refreshInFlight = null
+    })
+  }
+  return refreshInFlight
+}
+
+async function doRefresh(): Promise<boolean> {
+  const userStore = useUserStore()
+  if (!userStore.refreshToken) return false
+  try {
+    // 直连 axios：绕过实例拦截器，避免刷新失败再触发刷新
+    const resp = await axios.post(
+      '/api/v1/auth/refresh',
+      { refreshToken: userStore.refreshToken },
+      { timeout: REQUEST_TIMEOUT }
+    )
+    const { accessToken, refreshToken } = resp.data ?? {}
+    if (!accessToken) return false
+    userStore.setToken(accessToken, refreshToken)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** 是否需要重试 */
 function shouldRetry(statusCode: number) {
   return [
@@ -149,7 +221,7 @@ async function retryRequest<T>(
   try {
     return await request<T>(config)
   } catch (error) {
-    if (retries > 0 && error instanceof HttpError && shouldRetry(error.code)) {
+    if (retries > 0 && error instanceof HttpError && shouldRetry(Number(error.code))) {
       await delay(RETRY_DELAY)
       return retryRequest<T>(config, retries - 1)
     }
@@ -175,16 +247,21 @@ async function request<T = any>(config: ExtendedAxiosRequestConfig): Promise<T> 
   }
 
   try {
-    const res = await axiosInstance.request<BaseResponse<T>>(config)
+    const res = await axiosInstance.request<any>(config)
+    const data = res.data
 
-    // 显示成功消息
-    if (config.showSuccessMessage && res.data.msg) {
-      showSuccess(res.data.msg)
+    // 框架信封模式
+    if (isEnvelope(data)) {
+      if (config.showSuccessMessage && data.msg) {
+        showSuccess(data.msg)
+      }
+      return data.data as T
     }
 
-    return res.data.data as T
+    // IAM 原始载荷
+    return data as T
   } catch (error) {
-    if (error instanceof HttpError && error.code !== ApiStatus.unauthorized) {
+    if (error instanceof HttpError) {
       const showMsg = config.showErrorMessage !== false
       showError(error, showMsg)
     }
