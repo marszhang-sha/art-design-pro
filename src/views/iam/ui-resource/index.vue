@@ -228,12 +228,12 @@
       if (editing.value && editingId.value != null) {
         await iamUiResourceApi.update(editingId.value, {
           name: form.value.name,
-          parentId: form.value.parentId ?? undefined,
+          parentId: form.value.parentId === null ? undefined : form.value.parentId,
           route: form.value.route || undefined,
           component: form.value.component || undefined,
           icon: form.value.icon || undefined,
           sortOrder: form.value.sortOrder,
-          permissionId: form.value.permissionId,
+          permissionId: form.value.permissionId ?? undefined,
           status: form.value.status
         })
         ElMessage.success('已保存')
@@ -242,12 +242,12 @@
           code: form.value.code,
           name: form.value.name,
           resourceType: form.value.resourceType,
-          parentId: form.value.parentId ?? undefined,
+          parentId: form.value.parentId === null ? undefined : form.value.parentId,
           route: form.value.route || undefined,
           component: form.value.component || undefined,
           icon: form.value.icon || undefined,
           sortOrder: form.value.sortOrder,
-          permissionId: form.value.permissionId
+          permissionId: form.value.permissionId ?? undefined
         })
         ElMessage.success('已创建')
       }
