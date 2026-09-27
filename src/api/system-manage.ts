@@ -39,11 +39,22 @@ export function fetchGetMenuList() {
     }
     const children = (node.children ?? []).map((child) => toRecord(child))
 
+    if (node.children?.length) {
+      // 目录节点：path 为父前缀（/iam），children 为相对段
+      return {
+        name: node.code,
+        path: node.route ?? `/${node.code}`,
+        component: '/index/index',
+        meta,
+        children
+      }
+    }
+
     if (node.route) {
       return {
         name: node.code,
-        path: node.route,
-        component: `${node.route}/index`,
+        path: `/iam/${node.route}`,
+        component: `/iam/${node.route}/index`,
         meta,
         ...(children.length ? { children: children.filter((c) => c.path !== node.route) } : {})
       }
