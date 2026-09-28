@@ -8,7 +8,7 @@
  *
  * - 权限验证 - 根据路由 meta 中的权限列表验证用户权限
  * - DOM 控制 - 无权限时自动移除元素，而非隐藏
- * - 响应式更新 - 权限变化时自动更新元素状态
+ * - 仅挂载时校验 - 新元素（含行数据刷新产生的按钮）经 mounted 校验
  *
  * ## 使用示例
  *
@@ -27,6 +27,8 @@
  *
  * - 该指令会直接移除 DOM 元素，而不是使用 v-if 隐藏
  * - 权限列表从当前路由的 meta.authList 中获取
+ * - 校验仅在 mounted 执行一次：不用 updated 重校验——页面离场过渡/缓存
+ *   期间的重渲染会拿到已切换的路由，误删按钮且不可恢复（切页后按钮消失的根因）
  *
  * @module directives/auth
  * @author Art Design Pro Team
@@ -56,9 +58,10 @@ function removeElement(el: HTMLElement): void {
   }
 }
 
+// 不注册 updated 重校验：updated 会在页面离场过渡期间拿到已切换的
+// currentRoute（authList 属于别的页面），把本页按钮误删且无法恢复。
 const authDirective: AuthDirective = {
-  mounted: checkAuthPermission,
-  updated: checkAuthPermission
+  mounted: checkAuthPermission
 }
 
 export function setupAuthDirective(app: App): void {
