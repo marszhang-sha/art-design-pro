@@ -38,16 +38,7 @@
               停用
             </ElButton>
             <ElButton
-              v-if="row.status === 'DISABLED'"
-              v-auth="'agent:account:disable'"
-              link
-              type="success"
-              @click="onEnable(row)"
-            >
-              启用
-            </ElButton>
-            <ElButton
-              v-auth="'system:account:reset-password'"
+              v-auth="'agent:account:reset-password'"
               link
               type="primary"
               @click="onResetPassword(row)"
@@ -118,7 +109,13 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { ElMessage, ElMessageBox } from 'element-plus'
-  import { iamAccountApi, iamAuthApi, iamRoleApi, type IamAccount, type IamRole } from '@/api/iam'
+  import {
+    iamAgentRoleApi,
+    iamAuthApi,
+    iamSubAccountApi,
+    type IamAccount,
+    type IamRole
+  } from '@/api/iam'
 
   defineOptions({ name: 'IamSubAccount' })
 
@@ -126,6 +123,7 @@
   const list = ref<IamAccount[]>([])
   const keyword = ref('')
   const self = ref<IamAccount | null>(null)
+  const agentId = computed(() => Number(self.value?.agentId))
 
   const filtered = computed(() =>
     list.value.filter(
@@ -143,7 +141,7 @@
       if (!self.value) {
         self.value = await iamAuthApi.me()
       }
-      list.value = await iamAccountApi.list({ agentId: Number(self.value.agentId) })
+      list.value = await iamSubAccountApi.list(agentId.value)
     } finally {
       loading.value = false
     }
@@ -165,9 +163,7 @@
     if (!self.value) return
     submitting.value = true
     try {
-      await iamAccountApi.create({
-        scenario: 'AGENT_SUB',
-        masterId: Number(self.value.id),
+      await iamSubAccountApi.create(agentId.value, {
         username: form.value.username,
         displayName: form.value.displayName || undefined,
         mobile: form.value.mobile || undefined,
@@ -198,12 +194,8 @@
     ElMessageBox.confirm(`确认停用 ${row.username}？（离职/失效停用，不删除）`, '停用确认', {
       type: 'warning'
     })
-      .then(() => withReload(() => iamAccountApi.disable(row.id), '已停用'))
+      .then(() => withReload(() => iamSubAccountApi.disable(agentId.value, row.id), '已停用'))
       .catch(() => undefined)
-  }
-
-  function onEnable(row: IamAccount) {
-    withReload(() => iamAccountApi.enable(row.id), '已启用')
   }
 
   const tempVisible = ref(false)
@@ -214,7 +206,7 @@
       type: 'warning'
     })
       .then(async () => {
-        const resp = await iamAccountApi.adminResetPassword(row.id)
+        const resp = await iamSubAccountApi.adminResetPassword(agentId.value, row.id)
         tempPassword.value = resp.temporaryPassword
         tempVisible.value = true
       })
@@ -232,9 +224,11 @@
 
   async function openRoles(row: IamAccount) {
     rolesAccount.value = row
-    const all = await iamRoleApi.list()
-    assignableRoles.value = all.filter((r) => r.scope === 'AGENT')
-    const assigned = await iamAccountApi.listRoles(row.id)
+    const [all, assigned] = await Promise.all([
+      iamAgentRoleApi.list(agentId.value),
+      iamSubAccountApi.listRoles(agentId.value, row.id)
+    ])
+    assignableRoles.value = all
     selectedRoleIds.value = assigned.map((r) => r.roleId)
     originalRoleIds.value = [...selectedRoleIds.value]
     rolesVisible.value = true
@@ -247,8 +241,9 @@
       const target = rolesAccount.value.id
       const toAdd = selectedRoleIds.value.filter((id) => !originalRoleIds.value.includes(id))
       const toRemove = originalRoleIds.value.filter((id) => !selectedRoleIds.value.includes(id))
-      for (const roleId of toAdd) await iamAccountApi.assignRole(target, roleId)
-      for (const roleId of toRemove) await iamAccountApi.revokeRole(target, roleId)
+      for (const roleId of toAdd) await iamSubAccountApi.assignRole(agentId.value, target, roleId)
+      for (const roleId of toRemove)
+        await iamSubAccountApi.revokeRole(agentId.value, target, roleId)
       ElMessage.success('已保存')
       rolesVisible.value = false
       await load()

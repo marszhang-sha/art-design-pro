@@ -192,9 +192,8 @@ export interface IamMenuNode {
 // ---------- 账号管理 ----------
 
 export interface IamAccountCreatePayload {
-  scenario: 'PLATFORM' | 'AGENT_MASTER' | 'AGENT_SUB'
+  scenario: 'PLATFORM' | 'AGENT_MASTER'
   agentId?: number
-  masterId?: number
   username: string
   displayName?: string
   mobile?: string
@@ -245,6 +244,65 @@ export const iamAccountApi = {
   },
   revokeRole(id: string | number, roleId: number) {
     return request.del({ url: `${BASE}/accounts/${id}/roles/${roleId}` })
+  }
+}
+
+// ---------- 代理商子账号管理（API-IAM §3.6 agent 路由族 v0.4） ----------
+// 仅 agent:* 权限可达；路径 {agentId} 须与调用者 JWT agt 一致（后端三道防线）。
+
+export const iamSubAccountApi = {
+  list(agentId: number | string, params?: { status?: string; keyword?: string }) {
+    return request.get<IamAccount[]>({
+      url: `${BASE}/agents/${agentId}/sub-accounts`,
+      params
+    })
+  },
+  create(
+    agentId: number | string,
+    payload: {
+      username: string
+      displayName?: string
+      mobile?: string
+      email?: string
+    }
+  ) {
+    return request.post<IamAccount>({
+      url: `${BASE}/agents/${agentId}/sub-accounts`,
+      params: payload
+    })
+  },
+  disable(agentId: number | string, accountId: number | string) {
+    return request.post<{ account: IamAccount; cascaded: { id: number; status: string }[] }>({
+      url: `${BASE}/agents/${agentId}/sub-accounts/${accountId}/disable`
+    })
+  },
+  adminResetPassword(agentId: number | string, accountId: number | string) {
+    return request.post<{ temporaryPassword: string }>({
+      url: `${BASE}/agents/${agentId}/sub-accounts/${accountId}/reset-password`
+    })
+  },
+  listRoles(agentId: number | string, accountId: number | string) {
+    return request.get<IamAccountRole[]>({
+      url: `${BASE}/agents/${agentId}/sub-accounts/${accountId}/roles`
+    })
+  },
+  assignRole(agentId: number | string, accountId: number | string, roleId: number) {
+    return request.post({
+      url: `${BASE}/agents/${agentId}/sub-accounts/${accountId}/roles`,
+      params: { roleId }
+    })
+  },
+  revokeRole(agentId: number | string, accountId: number | string, roleId: number) {
+    return request.del({
+      url: `${BASE}/agents/${agentId}/sub-accounts/${accountId}/roles/${roleId}`
+    })
+  }
+}
+
+// Agent 自定义/内置角色（后端已过滤：AGENT scope 且属本代理商或全局内置）
+export const iamAgentRoleApi = {
+  list(agentId: number | string) {
+    return request.get<IamRole[]>({ url: `${BASE}/agents/${agentId}/roles` })
   }
 }
 
