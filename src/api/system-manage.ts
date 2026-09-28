@@ -51,10 +51,12 @@ export function fetchGetMenuList() {
     }
 
     if (node.route) {
+      // 页面 route 为相对段（如 account），框架 normalizeMenuPaths 拼父前缀 /iam
+      const segment = node.route.replace(/^\/+/, '').split('/').pop() ?? node.code
       return {
         name: node.code,
-        path: `/iam/${node.route}`,
-        component: `/iam/${node.route}/index`,
+        path: segment,
+        component: `/iam/${segment}/index`,
         meta,
         ...(children.length ? { children: children.filter((c) => c.path !== node.route) } : {})
       }
