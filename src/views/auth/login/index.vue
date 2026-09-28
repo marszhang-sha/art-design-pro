@@ -113,7 +113,7 @@
   import { useI18n } from 'vue-i18n'
   import { HttpError } from '@/utils/http/error'
   import { iamAuthApi } from '@/api/iam'
-  import { ElNotification, type FormInstance, type FormRules } from 'element-plus'
+  import { ElMessage, ElNotification, type FormInstance, type FormRules } from 'element-plus'
   import { useSettingStore } from '@/store/modules/setting'
 
   defineOptions({ name: 'Login' })
@@ -243,13 +243,15 @@
       const redirect = route.query.redirect as string
       router.push(redirect || '/')
     } catch (error) {
-      // 处理 HttpError
+      // 处理 HttpError：detail 由后端按 002-3 模糊口径生成（如 IAM-1001「用户名
+      // 或密码错误」），直接透传；无 detail（网络错等）退回 http 层的状态码文案
       if (error instanceof HttpError) {
-        // console.log(error.code)
+        const detail = (error.data as { detail?: string } | undefined)?.detail
+        ElMessage.error(detail || error.message)
       } else {
         // 处理非 HttpError
-        // ElMessage.error('登录失败，请稍后重试')
         console.error('[Login] Unexpected error:', error)
+        ElMessage.error(t('httpMsg.requestFailed'))
       }
     } finally {
       loading.value = false
