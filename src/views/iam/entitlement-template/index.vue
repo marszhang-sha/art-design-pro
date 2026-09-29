@@ -13,7 +13,7 @@
         </ElButton>
       </div>
 
-      <ElTable :data="list" v-loading="loading" border stripe>
+      <ArtTable :data="list" :loading="loading" border stripe :show-table-header="false">
         <ElTableColumn prop="code" label="标识" min-width="140" />
         <ElTableColumn prop="name" label="名称" min-width="160" />
         <ElTableColumn prop="description" label="描述" min-width="200" />
@@ -57,7 +57,7 @@
             </ElButton>
           </template>
         </ElTableColumn>
-      </ElTable>
+      </ArtTable>
     </ElCard>
 
     <!-- 新建模板 -->
@@ -96,7 +96,7 @@
           :disabled="p.status === 'DEPRECATED'"
         />
       </ElSelect>
-      <ElTable :data="itemRows" class="mt-3" border size="small">
+      <ArtTable :data="itemRows" class="mt-3" border size="small" :show-table-header="false">
         <ElTableColumn prop="code" label="权限码" min-width="180" />
         <ElTableColumn label="操作" width="80">
           <template #default="{ row }">
@@ -110,7 +110,7 @@
             </ElButton>
           </template>
         </ElTableColumn>
-      </ElTable>
+      </ArtTable>
     </ElDrawer>
   </div>
 </template>

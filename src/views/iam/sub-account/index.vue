@@ -16,7 +16,7 @@
         </ElButton>
       </div>
 
-      <ElTable :data="filtered" v-loading="loading" border stripe>
+      <ArtTable :data="filtered" :loading="loading" border stripe :show-table-header="false">
         <ElTableColumn prop="username" label="用户名" min-width="140" />
         <ElTableColumn prop="displayName" label="显示名" min-width="120" />
         <ElTableColumn label="状态" width="100">
@@ -50,7 +50,7 @@
             </ElButton>
           </template>
         </ElTableColumn>
-      </ElTable>
+      </ArtTable>
     </ElCard>
 
     <!-- 创建子账号 -->

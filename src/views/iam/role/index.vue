@@ -13,7 +13,7 @@
         </ElButton>
       </div>
 
-      <ElTable :data="filtered" v-loading="loading" border stripe>
+      <ArtTable :data="filtered" :loading="loading" border stripe :show-table-header="false">
         <ElTableColumn prop="code" label="标识" min-width="150" />
         <ElTableColumn prop="name" label="名称" min-width="140" />
         <ElTableColumn label="范围" width="100">
@@ -50,7 +50,7 @@
             </ElTooltip>
           </template>
         </ElTableColumn>
-      </ElTable>
+      </ArtTable>
     </ElCard>
 
     <!-- 创建角色 -->

@@ -27,7 +27,7 @@
 
       <ElTabs v-model="activeTab">
         <ElTabPane label="当前边界" name="active">
-          <ElTable :data="activeRows" v-loading="loading" border stripe>
+          <ArtTable :data="activeRows" :loading="loading" border stripe :show-table-header="false">
             <ElTableColumn label="权限码" min-width="220">
               <template #default="{ row }">{{ codeOf(row.permissionId) }}</template>
             </ElTableColumn>
@@ -58,7 +58,7 @@
                 </ElButton>
               </template>
             </ElTableColumn>
-          </ElTable>
+          </ArtTable>
         </ElTabPane>
 
         <ElTabPane label="授予" name="grant">
@@ -120,7 +120,7 @@
         </ElTabPane>
 
         <ElTabPane label="历史" name="history">
-          <ElTable :data="revokedRows" v-loading="loading" border stripe>
+          <ArtTable :data="revokedRows" :loading="loading" border stripe :show-table-header="false">
             <ElTableColumn label="权限码" min-width="220">
               <template #default="{ row }">{{ codeOf(row.permissionId) }}</template>
             </ElTableColumn>
@@ -130,7 +130,7 @@
                 <ElTag type="info">REVOKED</ElTag>
               </template>
             </ElTableColumn>
-          </ElTable>
+          </ArtTable>
         </ElTabPane>
       </ElTabs>
     </ElCard>

@@ -13,7 +13,14 @@
         </ElButton>
       </div>
 
-      <ElTable :data="flat" v-loading="loading" border row-key="id" default-expand-all>
+      <ArtTable
+        :data="flat"
+        :loading="loading"
+        border
+        row-key="id"
+        default-expand-all
+        :show-table-header="false"
+      >
         <ElTableColumn prop="name" label="名称" min-width="200" />
         <ElTableColumn prop="code" label="标识" min-width="160" />
         <ElTableColumn label="类型" width="100">
@@ -54,7 +61,7 @@
             </ElButton>
           </template>
         </ElTableColumn>
-      </ElTable>
+      </ArtTable>
     </ElCard>
 
     <!-- 创建/编辑 -->
