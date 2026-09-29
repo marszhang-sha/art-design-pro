@@ -83,7 +83,6 @@
     <ElDrawer v-model="itemsVisible" :title="`权限项 — ${current?.name ?? ''}`" size="480px">
       <ElSelect
         v-model="pickedPermId"
-        multiple
         filterable
         style="width: 100%"
         placeholder="添加权限（DEPRECATED 灰置）"

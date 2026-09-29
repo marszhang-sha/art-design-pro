@@ -215,7 +215,7 @@ export const iamAccountApi = {
     id: string | number,
     payload: Partial<Pick<IamAccount, 'displayName' | 'mobile' | 'email'>>
   ) {
-    return request.put<IamAccount>({ url: `${BASE}/accounts/${id}`, params: payload })
+    return request.patch<IamAccount>({ url: `${BASE}/accounts/${id}`, params: payload })
   },
   disable(id: string | number) {
     return request.post<{ account: IamAccount; cascaded: { id: number; status: string }[] }>({
@@ -371,7 +371,7 @@ export const iamRoleApi = {
       removePermissionId?: number
     }
   ) {
-    return request.put<IamRole>({ url: `${BASE}/roles/${id}`, params: payload })
+    return request.patch<IamRole>({ url: `${BASE}/roles/${id}`, params: payload })
   },
   listPermissions(roleId: number) {
     return request.get<number[]>({ url: `${BASE}/roles/${roleId}/permissions` })
@@ -398,7 +398,7 @@ export const iamPermissionApi = {
     return request.post<IamPermission>({ url: `${BASE}/permissions`, params: payload })
   },
   updateStatus(id: number, status: 'ACTIVE' | 'DEPRECATED') {
-    return request.put<IamPermission>({ url: `${BASE}/permissions/${id}`, params: { status } })
+    return request.patch<IamPermission>({ url: `${BASE}/permissions/${id}`, params: { status } })
   },
   deprecatedGrants() {
     return request.get<{ permissionId: number; code: string; activeGrants: number }[]>({
@@ -441,7 +441,7 @@ export const iamTemplateApi = {
     return request.get<IamEntitlementTemplate>({ url: `${BASE}/entitlement-templates/${id}` })
   },
   updateStatus(id: number, status: 'ACTIVE' | 'DISABLED') {
-    return request.put<IamEntitlementTemplate>({
+    return request.patch<IamEntitlementTemplate>({
       url: `${BASE}/entitlement-templates/${id}`,
       params: { status }
     })
@@ -454,7 +454,7 @@ export const iamTemplateApi = {
   },
   removeItem(id: number, permissionId: number) {
     return request.del({
-      url: `${BASE}/entitlement-templates/${id}/items?permissionId=${permissionId}`
+      url: `${BASE}/entitlement-templates/${id}/items/${permissionId}`
     })
   }
 }
@@ -491,7 +491,7 @@ export const iamUiResourceApi = {
       status?: 'ACTIVE' | 'DISABLED'
     }
   ) {
-    return request.put<IamUiResource>({ url: `${BASE}/ui-resources/${id}`, params: payload })
+    return request.patch<IamUiResource>({ url: `${BASE}/ui-resources/${id}`, params: payload })
   },
   tree() {
     return request.get<IamUiResource[]>({ url: `${BASE}/ui-resources/tree` })
