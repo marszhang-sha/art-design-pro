@@ -9,7 +9,7 @@
               新建认证域
             </ElButton>
           </div>
-          <ElTable :data="realms" v-loading="loading" border stripe>
+          <ArtTable :data="realms" :loading="loading" border stripe :show-table-header="false">
             <ElTableColumn prop="code" label="标识" width="120" />
             <ElTableColumn prop="name" label="名称" min-width="140" />
             <ElTableColumn prop="description" label="描述" min-width="200" />
@@ -20,7 +20,7 @@
                 </ElTag>
               </template>
             </ElTableColumn>
-          </ElTable>
+          </ArtTable>
         </ElTabPane>
 
         <!-- Provider -->
@@ -34,7 +34,7 @@
               新建 Provider
             </ElButton>
           </div>
-          <ElTable :data="providers" v-loading="loading" border stripe>
+          <ArtTable :data="providers" :loading="loading" border stripe :show-table-header="false">
             <ElTableColumn prop="code" label="标识" width="140" />
             <ElTableColumn prop="name" label="名称" min-width="120" />
             <ElTableColumn prop="providerType" label="类型" width="160" />
@@ -53,7 +53,7 @@
                 </ElTag>
               </template>
             </ElTableColumn>
-          </ElTable>
+          </ArtTable>
         </ElTabPane>
 
         <!-- 密码策略 -->
@@ -63,7 +63,7 @@
               新建密码策略
             </ElButton>
           </div>
-          <ElTable :data="policies" v-loading="loading" border stripe>
+          <ArtTable :data="policies" :loading="loading" border stripe :show-table-header="false">
             <ElTableColumn prop="code" label="标识" width="140" />
             <ElTableColumn prop="name" label="名称" min-width="140" />
             <ElTableColumn prop="algorithm" label="算法" width="140" />
@@ -75,7 +75,7 @@
                 </ElTag>
               </template>
             </ElTableColumn>
-          </ElTable>
+          </ArtTable>
         </ElTabPane>
       </ElTabs>
     </ElCard>

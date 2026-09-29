@@ -20,7 +20,7 @@
             </ElButton>
           </div>
 
-          <ElTable :data="filtered" v-loading="loading" border stripe>
+          <ArtTable :data="filtered" :loading="loading" border stripe :show-table-header="false">
             <ElTableColumn prop="code" label="权限码" min-width="220" />
             <ElTableColumn prop="name" label="名称" min-width="140" />
             <ElTableColumn prop="namespace" label="命名空间" width="130" />
@@ -44,7 +44,7 @@
                 </ElButton>
               </template>
             </ElTableColumn>
-          </ElTable>
+          </ArtTable>
         </ElTabPane>
 
         <ElTabPane label="废弃治理看板" name="dashboard">
@@ -54,7 +54,7 @@
             :closable="false"
             class="mb-3"
           />
-          <ElTable :data="dashboard" v-loading="loading" border>
+          <ArtTable :data="dashboard" :loading="loading" border :show-table-header="false">
             <ElTableColumn prop="code" label="权限码" min-width="220" />
             <ElTableColumn prop="activeGrants" label="存量角色引用数" width="160" />
             <ElTableColumn label="状态" width="140">
@@ -64,7 +64,7 @@
                 </ElTag>
               </template>
             </ElTableColumn>
-          </ElTable>
+          </ArtTable>
         </ElTabPane>
       </ElTabs>
     </ElCard>
