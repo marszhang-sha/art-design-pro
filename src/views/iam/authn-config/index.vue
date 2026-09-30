@@ -1,84 +1,81 @@
 <template>
-  <div class="p-4">
-    <ElCard shadow="never">
-      <ElTabs v-model="activeTab">
-        <!-- 认证域 -->
-        <ElTabPane label="认证域" name="realms">
-          <div class="mb-3 flex justify-end">
-            <ElButton v-auth="'system:realm:create'" type="primary" @click="realmVisible = true">
-              新建认证域
-            </ElButton>
-          </div>
-          <ArtTable :data="realms" :loading="loading" border stripe :show-table-header="false">
-            <ElTableColumn prop="code" label="标识" width="120" />
-            <ElTableColumn prop="name" label="名称" min-width="140" />
-            <ElTableColumn prop="description" label="描述" min-width="200" />
-            <ElTableColumn label="状态" width="100">
-              <template #default="{ row }">
-                <ElTag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-                  {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                </ElTag>
-              </template>
-            </ElTableColumn>
-          </ArtTable>
-        </ElTabPane>
+  <div class="art-full-height">
+    <ElTabs v-model="activeTab" class="authn-tabs">
+      <!-- 认证域 -->
+      <ElTabPane label="认证域" name="realms">
+        <ElCard class="art-table-card">
+          <ArtTableHeader
+            v-model:columns="realmColumnChecks"
+            :loading="realmLoading"
+            @refresh="refreshRealmData"
+          >
+            <template #left>
+              <ElSpace wrap>
+                <ElButton
+                  v-auth="'system:realm:create'"
+                  type="primary"
+                  @click="realmVisible = true"
+                >
+                  创建域
+                </ElButton>
+              </ElSpace>
+            </template>
+          </ArtTableHeader>
 
-        <!-- Provider -->
-        <ElTabPane label="Provider" name="providers">
-          <div class="mb-3 flex justify-end">
-            <ElButton
-              v-auth="'system:provider:create'"
-              type="primary"
-              @click="providerVisible = true"
-            >
-              新建 Provider
-            </ElButton>
-          </div>
-          <ArtTable :data="providers" :loading="loading" border stripe :show-table-header="false">
-            <ElTableColumn prop="code" label="标识" width="140" />
-            <ElTableColumn prop="name" label="名称" min-width="120" />
-            <ElTableColumn prop="providerType" label="类型" width="160" />
-            <ElTableColumn label="所属域" width="100">
-              <template #default="{ row }">{{ realmName(row.realmId) }}</template>
-            </ElTableColumn>
-            <ElTableColumn label="密码策略" min-width="140">
-              <template #default="{ row }">
-                {{ policyName(row.currentPasswordPolicyId) ?? '—（非密码通道）' }}
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="状态" width="100">
-              <template #default="{ row }">
-                <ElTag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-                  {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-                </ElTag>
-              </template>
-            </ElTableColumn>
-          </ArtTable>
-        </ElTabPane>
+          <ArtTable :loading="realmLoading" :data="realmData" :columns="realmColumns" />
+        </ElCard>
+      </ElTabPane>
 
-        <!-- 密码策略 -->
-        <ElTabPane label="密码策略" name="policies">
-          <div class="mb-3 flex justify-end">
-            <ElButton v-auth="'system:policy:create'" type="primary" @click="policyVisible = true">
-              新建密码策略
-            </ElButton>
-          </div>
-          <ArtTable :data="policies" :loading="loading" border stripe :show-table-header="false">
-            <ElTableColumn prop="code" label="标识" width="140" />
-            <ElTableColumn prop="name" label="名称" min-width="140" />
-            <ElTableColumn prop="algorithm" label="算法" width="140" />
-            <ElTableColumn prop="algorithmVersion" label="版本" width="100" />
-            <ElTableColumn label="状态" width="110">
-              <template #default="{ row }">
-                <ElTag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-                  {{ row.status === 'ACTIVE' ? '启用' : '退役' }}
-                </ElTag>
-              </template>
-            </ElTableColumn>
-          </ArtTable>
-        </ElTabPane>
-      </ElTabs>
-    </ElCard>
+      <!-- Provider -->
+      <ElTabPane label="Provider" name="providers">
+        <ElCard class="art-table-card">
+          <ArtTableHeader
+            v-model:columns="providerColumnChecks"
+            :loading="providerLoading"
+            @refresh="refreshProviderData"
+          >
+            <template #left>
+              <ElSpace wrap>
+                <ElButton
+                  v-auth="'system:provider:create'"
+                  type="primary"
+                  @click="providerVisible = true"
+                >
+                  创建 Provider
+                </ElButton>
+              </ElSpace>
+            </template>
+          </ArtTableHeader>
+
+          <ArtTable :loading="providerLoading" :data="providerData" :columns="providerColumns" />
+        </ElCard>
+      </ElTabPane>
+
+      <!-- 密码策略 -->
+      <ElTabPane label="密码策略" name="policies">
+        <ElCard class="art-table-card">
+          <ArtTableHeader
+            v-model:columns="policyColumnChecks"
+            :loading="policyLoading"
+            @refresh="refreshPolicyData"
+          >
+            <template #left>
+              <ElSpace wrap>
+                <ElButton
+                  v-auth="'system:policy:create'"
+                  type="primary"
+                  @click="policyVisible = true"
+                >
+                  创建密码策略
+                </ElButton>
+              </ElSpace>
+            </template>
+          </ArtTableHeader>
+
+          <ArtTable :loading="policyLoading" :data="policyData" :columns="policyColumns" />
+        </ElCard>
+      </ElTabPane>
+    </ElTabs>
 
     <!-- 新建认证域 -->
     <ElDialog v-model="realmVisible" title="新建认证域" width="460px">
@@ -105,7 +102,7 @@
         <ElFormItem label="所属域" required>
           <ElSelect v-model="providerForm.realmId" style="width: 100%">
             <ElOption
-              v-for="r in realms"
+              v-for="r in realmData"
               :key="r.id"
               :value="r.id"
               :label="`${r.code}（${r.name}）`"
@@ -131,7 +128,7 @@
             :disabled="providerForm.providerType !== 'LOCAL_PASSWORD'"
           >
             <ElOption
-              v-for="p in policies"
+              v-for="p in policyData"
               :key="p.id"
               :value="p.id"
               :label="`${p.code}（${p.algorithm}）`"
@@ -178,51 +175,154 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted, ref } from 'vue'
-  import { ElMessage } from 'element-plus'
+  import { h, ref } from 'vue'
+  import { ElMessage, ElTag } from 'element-plus'
+  import { useTable } from '@/hooks/core/useTable'
   import {
     iamAuthnConfigApi,
     type IamPasswordPolicy,
     type IamProvider,
     type IamRealm
   } from '@/api/iam'
+  import { wrapAll } from '@/views/iam/table'
 
   defineOptions({ name: 'IamAuthnConfig' })
 
   const PROVIDER_TYPES = ['LOCAL_PASSWORD', 'WECOM', 'OIDC', 'SAML', 'LDAP', 'OTP']
 
-  const loading = ref(false)
-  const saving = ref(false)
   const activeTab = ref('realms')
 
-  const realms = ref<IamRealm[]>([])
-  const providers = ref<IamProvider[]>([])
-  const policies = ref<IamPasswordPolicy[]>([])
+  /** 三个资源种类各自独立 useTable。apiFn 必须是显式标注返回类型的具名函数
+   * （内联箭头会退化 TRecord = unknown；responseAdapter 会退化为 never），
+   * 全量列表经 wrapAll 包装为标准分页信封，分页栏不渲染。 */
+  function fetchRealms(): Promise<Api.Common.PaginatedResponse<IamRealm>> {
+    return iamAuthnConfigApi.listRealms().then(wrapAll)
+  }
+
+  function fetchProviders(): Promise<Api.Common.PaginatedResponse<IamProvider>> {
+    return iamAuthnConfigApi.listProviders().then(wrapAll)
+  }
+
+  function fetchPasswordPolicies(): Promise<Api.Common.PaginatedResponse<IamPasswordPolicy>> {
+    return iamAuthnConfigApi.listPasswordPolicies().then(wrapAll)
+  }
+
+  // ---------- 认证域 ----------
+
+  const {
+    columns: realmColumns,
+    columnChecks: realmColumnChecks,
+    data: realmData,
+    loading: realmLoading,
+    refreshData: refreshRealmData
+  } = useTable({
+    core: {
+      apiFn: fetchRealms,
+      columnsFactory: () => [
+        { prop: 'code', label: '标识', width: 120, sortable: true },
+        { prop: 'name', label: '名称', minWidth: 140, sortable: true },
+        { prop: 'description', label: '描述', minWidth: 200, sortable: true },
+        {
+          prop: 'status',
+          label: '状态',
+          width: 100,
+          sortable: true,
+          formatter: (row: IamRealm) =>
+            h(ElTag, { type: row.status === 'ACTIVE' ? 'success' : 'info' }, () =>
+              row.status === 'ACTIVE' ? '启用' : '停用'
+            )
+        }
+      ]
+    }
+  })
+
+  // ---------- Provider ----------
+
+  const {
+    columns: providerColumns,
+    columnChecks: providerColumnChecks,
+    data: providerData,
+    loading: providerLoading,
+    refreshData: refreshProviderData
+  } = useTable({
+    core: {
+      apiFn: fetchProviders,
+      columnsFactory: () => [
+        { prop: 'code', label: '标识', width: 140, sortable: true },
+        { prop: 'name', label: '名称', minWidth: 120, sortable: true },
+        { prop: 'providerType', label: '类型', width: 160, sortable: true },
+        {
+          prop: 'realmId',
+          label: '所属域',
+          width: 100,
+          sortable: true,
+          formatter: (row: IamProvider) => realmName(row.realmId)
+        },
+        {
+          prop: 'currentPasswordPolicyId',
+          label: '密码策略',
+          minWidth: 140,
+          sortable: true,
+          formatter: (row: IamProvider) =>
+            policyName(row.currentPasswordPolicyId) ?? '—（非密码通道）'
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          width: 100,
+          sortable: true,
+          formatter: (row: IamProvider) =>
+            h(ElTag, { type: row.status === 'ACTIVE' ? 'success' : 'info' }, () =>
+              row.status === 'ACTIVE' ? '启用' : '停用'
+            )
+        }
+      ]
+    }
+  })
+
+  // ---------- 密码策略 ----------
+
+  const {
+    columns: policyColumns,
+    columnChecks: policyColumnChecks,
+    data: policyData,
+    loading: policyLoading,
+    refreshData: refreshPolicyData
+  } = useTable({
+    core: {
+      apiFn: fetchPasswordPolicies,
+      columnsFactory: () => [
+        { prop: 'code', label: '标识', width: 140, sortable: true },
+        { prop: 'name', label: '名称', minWidth: 140, sortable: true },
+        { prop: 'algorithm', label: '算法', width: 140, sortable: true },
+        { prop: 'algorithmVersion', label: '版本', width: 100, sortable: true },
+        {
+          prop: 'status',
+          label: '状态',
+          width: 110,
+          sortable: true,
+          formatter: (row: IamPasswordPolicy) =>
+            h(ElTag, { type: row.status === 'ACTIVE' ? 'success' : 'info' }, () =>
+              row.status === 'ACTIVE' ? '启用' : '已退役'
+            )
+        }
+      ]
+    }
+  })
 
   function realmName(realmId: number) {
-    return realms.value.find((r) => r.id === realmId)?.code ?? String(realmId)
+    return realmData.value.find((r) => r.id === realmId)?.code ?? String(realmId)
   }
 
   function policyName(policyId: number | null) {
     if (policyId == null) return null
-    return policies.value.find((p) => p.id === policyId)?.code ?? String(policyId)
+    return policyData.value.find((p) => p.id === policyId)?.code ?? String(policyId)
   }
 
-  async function load() {
-    loading.value = true
-    try {
-      realms.value = await iamAuthnConfigApi.listRealms()
-      providers.value = await iamAuthnConfigApi.listProviders()
-      policies.value = await iamAuthnConfigApi.listPasswordPolicies()
-    } finally {
-      loading.value = false
-    }
-  }
+  // ---------- 认证域：创建 ----------
 
-  onMounted(load)
-
-  // ---------- 认证域 ----------
   const realmVisible = ref(false)
+  const saving = ref(false)
   const realmForm = ref({ code: '', name: '', description: '' })
 
   async function saveRealm() {
@@ -231,13 +331,14 @@
       await iamAuthnConfigApi.createRealm(realmForm.value)
       ElMessage.success('认证域已创建')
       realmVisible.value = false
-      await load()
+      await refreshRealmData()
     } finally {
       saving.value = false
     }
   }
 
-  // ---------- Provider ----------
+  // ---------- Provider：创建 ----------
+
   const providerVisible = ref(false)
   const providerForm = ref({
     realmId: undefined as number | undefined,
@@ -263,13 +364,14 @@
       })
       ElMessage.success('Provider 已创建')
       providerVisible.value = false
-      await load()
+      await refreshProviderData()
     } finally {
       saving.value = false
     }
   }
 
-  // ---------- 密码策略 ----------
+  // ---------- 密码策略：创建 ----------
+
   const policyVisible = ref(false)
   const policyForm = ref({
     code: '',
@@ -284,9 +386,31 @@
       await iamAuthnConfigApi.createPasswordPolicy(policyForm.value)
       ElMessage.success('密码策略已创建')
       policyVisible.value = false
-      await load()
+      await refreshPolicyData()
     } finally {
       saving.value = false
     }
   }
 </script>
+
+<style lang="scss" scoped>
+  /* Tab 链路高度透传：art-full-height → tabs → content → pane，
+     使各 pane 内的 art-table-card（flex:1）与 ArtTable 高度自适应 */
+  .authn-tabs {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+
+    :deep(.el-tabs__content) {
+      flex: 1;
+      min-height: 0;
+    }
+
+    :deep(.el-tab-pane) {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+  }
+</style>

@@ -1,50 +1,19 @@
 <template>
-  <div class="p-4">
-    <ElCard shadow="never">
+  <div class="art-full-height">
+    <ElCard class="art-table-card" :style="{ 'margin-top': '0' }">
       <ElTabs v-model="activeTab">
         <ElTabPane label="权限注册表" name="registry">
-          <div class="mb-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <ElSelect v-model="nsFilter" placeholder="命名空间" clearable style="width: 160px">
-                <ElOption v-for="ns in NAMESPACES" :key="ns" :value="ns" :label="ns" />
-              </ElSelect>
-              <ElInput
-                v-model="keyword"
-                placeholder="搜索 code/名称"
-                clearable
-                style="width: 220px"
-              />
-            </div>
-            <ElButton v-auth="'system:permission:create'" type="primary" @click="openCreate">
-              注册权限
-            </ElButton>
-          </div>
-
-          <ArtTable :data="filtered" :loading="loading" border stripe :show-table-header="false">
-            <ElTableColumn prop="code" label="权限码" min-width="220" />
-            <ElTableColumn prop="name" label="名称" min-width="140" />
-            <ElTableColumn prop="namespace" label="命名空间" width="130" />
-            <ElTableColumn label="状态" width="110">
-              <template #default="{ row }">
-                <ElTag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-                  {{ row.status === 'ACTIVE' ? '有效' : '已废弃' }}
-                </ElTag>
-              </template>
-            </ElTableColumn>
-            <ElTableColumn label="操作" width="120" fixed="right">
-              <template #default="{ row }">
-                <ElButton
-                  v-if="row.status === 'ACTIVE'"
-                  v-auth="'system:permission:update'"
-                  link
-                  type="danger"
-                  @click="onDeprecate(row)"
-                >
-                  废弃
+          <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
+            <template #left>
+              <ElSpace wrap>
+                <ElButton v-auth="'system:permission:create'" type="primary" @click="openCreate">
+                  新建权限
                 </ElButton>
-              </template>
-            </ElTableColumn>
-          </ArtTable>
+              </ElSpace>
+            </template>
+          </ArtTableHeader>
+
+          <ArtTable :loading="loading" :data="data" :columns="columns"> </ArtTable>
         </ElTabPane>
 
         <ElTabPane label="废弃治理看板" name="dashboard">
@@ -54,7 +23,7 @@
             :closable="false"
             class="mb-3"
           />
-          <ArtTable :data="dashboard" :loading="loading" border :show-table-header="false">
+          <ArtTable :data="dashboard" :loading="dashboardLoading" border :show-table-header="false">
             <ElTableColumn prop="code" label="权限码" min-width="220" />
             <ElTableColumn prop="activeGrants" label="存量角色引用数" width="160" />
             <ElTableColumn label="状态" width="140">
@@ -105,9 +74,13 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
-  import { ElMessage, ElMessageBox } from 'element-plus'
+  import { computed, h, onMounted, ref } from 'vue'
+  import { ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { ButtonMoreItem } from '@/components/core/forms/art-button-more/index.vue'
+  import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
+  import { useTable } from '@/hooks/core/useTable'
   import { iamPermissionApi, type IamPermission } from '@/api/iam'
+  import { wrapAll } from '@/views/iam/table'
 
   defineOptions({ name: 'IamPermission' })
 
@@ -122,36 +95,137 @@
     'compliance'
   ]
 
-  const loading = ref(false)
-  const list = ref<IamPermission[]>([])
   const activeTab = ref('registry')
-  const nsFilter = ref('')
-  const keyword = ref('')
 
-  const dashboard = ref<{ permissionId: number; code: string; activeGrants: number }[]>([])
+  /** 全量列表接口返回裸数组：apiFn 内用 wrapAll 包装为标准信封，
+   *  返回类型显式标注后 useTable 的 InferRecordType 才能推出 TRecord = IamPermission
+   *  （内联箭头函数会退化 TRecord = unknown；responseAdapter 则退化为 never） */
+  function fetchPermissions(): Promise<Api.Common.PaginatedResponse<IamPermission>> {
+    return iamPermissionApi.list().then(wrapAll)
+  }
 
-  const filtered = computed(() =>
-    list.value.filter((p) => {
-      if (nsFilter.value && p.namespace !== nsFilter.value) return false
-      if (keyword.value && !p.code.includes(keyword.value) && !p.name.includes(keyword.value))
-        return false
-      return true
-    })
-  )
+  const { columns, columnChecks, data, loading, refreshData } = useTable({
+    core: {
+      apiFn: fetchPermissions,
+      columnsFactory: () => [
+        {
+          prop: 'code',
+          label: '权限码',
+          minWidth: 220,
+          sortable: true
+        },
+        {
+          prop: 'name',
+          label: '名称',
+          minWidth: 140,
+          sortable: true
+        },
+        {
+          prop: 'namespace',
+          label: '命名空间',
+          width: 130,
+          sortable: true
+        },
+        {
+          prop: 'resource',
+          label: '资源',
+          minWidth: 120,
+          sortable: true
+        },
+        {
+          prop: 'action',
+          label: '动作',
+          width: 100,
+          sortable: true
+        },
+        {
+          prop: 'description',
+          label: '描述',
+          minWidth: 150,
+          sortable: true,
+          showOverflowTooltip: true
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          width: 100,
+          sortable: true,
+          formatter: (row: IamPermission) =>
+            h(ElTag, { type: row.status === 'ACTIVE' ? 'success' : 'info' }, () =>
+              row.status === 'ACTIVE' ? '有效' : '已废弃'
+            )
+        },
+        {
+          prop: 'operation',
+          label: '操作',
+          width: 90,
+          fixed: 'right',
+          formatter: (row: IamPermission) =>
+            h('div', [
+              h(ArtButtonMore, {
+                list: operationList(row),
+                onClick: (item: ButtonMoreItem) => buttonMoreClick(item, row)
+              })
+            ])
+        }
+      ]
+    }
+  })
 
-  async function load() {
-    loading.value = true
-    try {
-      list.value = await iamPermissionApi.list()
-      dashboard.value = await iamPermissionApi.deprecatedGrants()
-    } finally {
-      loading.value = false
+  /** 按行状态构造操作项（ArtButtonMore 内置 per-item auth 过滤，无权限项自动隐藏）。
+   *  仅 ACTIVE 行有「废弃」——契约只定义废弃单向语义（BR-IAM-034/IAM-3006），
+   *  无任何规范授权 DEPRECATED→ACTIVE 重新启用，故不提供「启用」项。 */
+  function operationList(row: IamPermission): ButtonMoreItem[] {
+    const list: ButtonMoreItem[] = []
+    if (row.status === 'ACTIVE') {
+      list.push({
+        key: 'deprecate',
+        label: '废弃',
+        icon: 'ri:forbid-line',
+        color: '#f56c6c',
+        auth: 'system:permission:update'
+      })
+    }
+    return list
+  }
+
+  function buttonMoreClick(item: ButtonMoreItem, row: IamPermission) {
+    switch (item.key) {
+      case 'deprecate':
+        onDeprecate(row)
+        break
     }
   }
 
-  onMounted(load)
+  // ---------- 废弃治理看板（003-2：存量引用清零跟踪） ----------
+
+  interface DeprecatedGrantRow {
+    permissionId: number
+    code: string
+    activeGrants: number
+  }
+
+  const dashboardLoading = ref(false)
+  const dashboard = ref<DeprecatedGrantRow[]>([])
+
+  async function loadDashboard() {
+    dashboardLoading.value = true
+    try {
+      dashboard.value = await iamPermissionApi.deprecatedGrants()
+    } finally {
+      dashboardLoading.value = false
+    }
+  }
+
+  onMounted(loadDashboard)
+
+  /** 变更后刷新：旧页 load() 同时重拉注册表与看板，此处等价并行刷新 */
+  async function reloadAll() {
+    await Promise.all([refreshData(), loadDashboard()])
+  }
 
   // ---------- 注册 ----------
+
   const createVisible = ref(false)
   const submitting = ref(false)
   const form = ref({
@@ -183,7 +257,7 @@
       })
       ElMessage.success('注册成功')
       createVisible.value = false
-      await load()
+      await reloadAll()
     } finally {
       submitting.value = false
     }
@@ -200,7 +274,7 @@
       .then(async () => {
         await iamPermissionApi.updateStatus(row.id, 'DEPRECATED')
         ElMessage.success('已废弃')
-        await load()
+        await reloadAll()
       })
       .catch(() => undefined)
   }

@@ -11,6 +11,39 @@ const BASE = '/api/v1'
 
 // ---------- 类型 ----------
 
+/** IAM 分页响应信封（契约 §1：{items, page, size, total}） */
+export interface IamPage<T> {
+  items: T[]
+  page: number
+  size: number
+  total: number
+}
+
+/** 排序方向（契约 §1：sortBy 各端点白名单 + sortOrder） */
+export type IamSortOrder = 'asc' | 'desc'
+
+/** GET /accounts 列表参数（分页 + 过滤 + 排序，契约 §3.2） */
+export interface IamAccountListParams {
+  page?: number
+  size?: number
+  agentId?: number
+  status?: string
+  type?: string
+  keyword?: string
+  sortBy?: string
+  sortOrder?: IamSortOrder
+}
+
+/** GET /agents/{agentId}/sub-accounts 列表参数（过滤 status,keyword；排序白名单同 /accounts，契约 §3.6） */
+export interface IamSubAccountListParams {
+  page?: number
+  size?: number
+  status?: string
+  keyword?: string
+  sortBy?: string
+  sortOrder?: IamSortOrder
+}
+
 export interface IamAccount {
   id: string
   username: string
@@ -205,8 +238,8 @@ export const iamAccountApi = {
   create(payload: IamAccountCreatePayload) {
     return request.post<IamAccount>({ url: `${BASE}/accounts`, params: payload })
   },
-  list(params?: { agentId?: number; status?: string; type?: string; keyword?: string }) {
-    return request.get<IamAccount[]>({ url: `${BASE}/accounts`, params })
+  list(params?: IamAccountListParams) {
+    return request.get<IamPage<IamAccount>>({ url: `${BASE}/accounts`, params })
   },
   get(id: string | number) {
     return request.get<IamAccount>({ url: `${BASE}/accounts/${id}` })
@@ -251,8 +284,8 @@ export const iamAccountApi = {
 // 仅 agent:* 权限可达；路径 {agentId} 须与调用者 JWT agt 一致（后端三道防线）。
 
 export const iamSubAccountApi = {
-  list(agentId: number | string, params?: { status?: string; keyword?: string }) {
-    return request.get<IamAccount[]>({
+  list(agentId: number | string, params?: IamSubAccountListParams) {
+    return request.get<IamPage<IamAccount>>({
       url: `${BASE}/agents/${agentId}/sub-accounts`,
       params
     })

@@ -1,98 +1,37 @@
 <template>
-  <div class="p-4">
-    <ElCard shadow="never">
-      <div class="mb-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <ElInput
-            v-model="keyword"
-            placeholder="搜索用户名/显示名"
-            clearable
-            style="width: 220px"
-          />
-          <ElSelect v-model="statusFilter" placeholder="状态" clearable style="width: 140px">
-            <ElOption label="ACTIVE" value="ACTIVE" />
-            <ElOption label="DISABLED" value="DISABLED" />
-            <ElOption label="LOCKED" value="LOCKED" />
-          </ElSelect>
-          <ElButton @click="load">查询</ElButton>
-        </div>
-        <ElButton v-auth="'system:account:create'" type="primary" @click="openCreate">
-          创建账号
-        </ElButton>
-      </div>
+  <div class="art-full-height">
+    <AccountSearch
+      v-show="showSearchBar"
+      v-model="searchForm"
+      @search="handleSearch"
+      @reset="handleReset"
+    ></AccountSearch>
 
-      <ArtTable :data="filtered" :loading="loading" border stripe :show-table-header="false">
-        <ElTableColumn prop="username" label="用户名" min-width="140" />
-        <ElTableColumn prop="displayName" label="显示名" min-width="120" />
-        <ElTableColumn label="类型" width="130">
-          <template #default="{ row }">
-            <ElTag :type="row.accountType === 'PLATFORM_USER' ? 'danger' : 'primary'">
-              {{ row.accountType === 'PLATFORM_USER' ? '平台' : '代理商' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="agentId" label="代理商ID" width="100" />
-        <ElTableColumn label="主账号" width="80">
-          <template #default="{ row }">
-            <ElTag v-if="row.isMaster" type="warning" size="small">主账号</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="状态" width="100">
-          <template #default="{ row }">
-            <ElTag :type="statusTagType(row.status)">{{ statusText(row.status) }}</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="260" fixed="right">
-          <template #default="{ row }">
-            <ElButton
-              v-if="row.status === 'ACTIVE'"
-              v-auth="'system:account:disable'"
-              link
-              type="danger"
-              @click="onDisable(row)"
-            >
-              停用
+    <ElCard class="art-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
+      <ArtTableHeader
+        v-model:columns="columnChecks"
+        v-model:showSearchBar="showSearchBar"
+        :loading="loading"
+        @refresh="refreshData"
+      >
+        <template #left>
+          <ElSpace wrap>
+            <ElButton v-auth="'system:account:create'" type="primary" @click="openCreate">
+              创建账号
             </ElButton>
-            <ElButton
-              v-if="row.status === 'DISABLED'"
-              v-auth="'system:account:enable'"
-              link
-              type="success"
-              @click="onEnable(row)"
-            >
-              启用
-            </ElButton>
-            <ElButton
-              v-if="row.status === 'ACTIVE'"
-              v-auth="'system:account:lock'"
-              link
-              type="warning"
-              @click="onLock(row)"
-            >
-              锁定
-            </ElButton>
-            <ElButton
-              v-if="row.status === 'LOCKED'"
-              v-auth="'system:account:unlock'"
-              link
-              type="success"
-              @click="onUnlock(row)"
-            >
-              解锁
-            </ElButton>
-            <ElButton
-              v-auth="'system:account:reset-password'"
-              link
-              type="primary"
-              @click="onResetPassword(row)"
-            >
-              重置密码
-            </ElButton>
-            <ElButton v-auth="'system:role:assign'" link type="primary" @click="openRoles(row)">
-              授权角色
-            </ElButton>
-          </template>
-        </ElTableColumn>
+          </ElSpace>
+        </template>
+      </ArtTableHeader>
+
+      <ArtTable
+        :loading="loading"
+        :data="data"
+        :columns="columns"
+        :pagination="pagination"
+        @pagination:size-change="handleSizeChange"
+        @pagination:current-change="handleCurrentChange"
+        @sort-change="handleSortChange"
+      >
       </ArtTable>
     </ElCard>
 
@@ -165,42 +104,245 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
-  import { ElMessage, ElMessageBox } from 'element-plus'
-  import { iamAccountApi, iamRoleApi, type IamAccount, type IamRole } from '@/api/iam'
+  import { h, ref } from 'vue'
+  import { ElMessage, ElMessageBox, ElTag } from 'element-plus'
+  import { ButtonMoreItem } from '@/components/core/forms/art-button-more/index.vue'
+  import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
+  import { useTable } from '@/hooks/core/useTable'
+  import {
+    iamAccountApi,
+    iamRoleApi,
+    type IamAccount,
+    type IamAccountListParams,
+    type IamRole,
+    type IamSortOrder
+  } from '@/api/iam'
+  import { toPaginated } from '@/views/iam/table'
+  import AccountSearch from './modules/account-search.vue'
 
   defineOptions({ name: 'IamAccount' })
 
-  const loading = ref(false)
-  const list = ref<IamAccount[]>([])
-  const keyword = ref('')
-  const statusFilter = ref('')
+  interface AccountSearchFormParams {
+    keyword?: string
+    status?: string
+    type?: string
+    agentId?: number
+  }
 
-  const filtered = computed(() =>
-    list.value.filter((a) => {
-      if (statusFilter.value && a.status !== statusFilter.value) return false
-      if (
-        keyword.value &&
-        !a.username.includes(keyword.value) &&
-        !(a.displayName ?? '').includes(keyword.value)
-      )
-        return false
-      return true
+  // 搜索表单 + 服务端排序状态（sortBy 白名单见契约 §3.2：
+  // id,username,displayName,accountType,agentId,status,createdAt）
+  const searchForm = ref<AccountSearchFormParams>({})
+  const activeFilters = ref<AccountSearchFormParams>({})
+  const sortBy = ref<string | undefined>(undefined)
+  const sortOrder = ref<IamSortOrder | undefined>(undefined)
+  const showSearchBar = ref(true)
+
+  /** apiFn 内归一信封：返回类型显式标注为标准 PaginatedResponse，
+   *  useTable 的 InferRecordType 才能推出 TRecord = IamAccount
+   *  （内联箭头函数会退化 TRecord = unknown；IamPage 走 responseAdapter 则退化为 never） */
+  function fetchAccountList(
+    params: IamAccountListParams
+  ): Promise<Api.Common.PaginatedResponse<IamAccount>> {
+    return iamAccountApi.list(params).then(toPaginated)
+  }
+
+  const {
+    columns,
+    columnChecks,
+    data,
+    loading,
+    pagination,
+    getData,
+    replaceSearchParams,
+    resetSearchParams,
+    handleSizeChange,
+    handleCurrentChange,
+    refreshData
+  } = useTable({
+    core: {
+      apiFn: fetchAccountList,
+      apiParams: {
+        page: 1,
+        size: 20
+      },
+      // 契约分页键为 page/size（信封 {items,page,size,total}，§1）
+      paginationKey: { current: 'page', size: 'size' },
+      columnsFactory: () => [
+        {
+          prop: 'username',
+          label: '用户名',
+          minWidth: 140,
+          sortable: 'custom'
+        },
+        {
+          prop: 'displayName',
+          label: '显示名',
+          minWidth: 120,
+          sortable: 'custom'
+        },
+        {
+          prop: 'accountType',
+          label: '类型',
+          width: 110,
+          sortable: 'custom',
+          formatter: (row: IamAccount) =>
+            h(ElTag, { type: row.accountType === 'PLATFORM_USER' ? 'danger' : 'primary' }, () =>
+              row.accountType === 'PLATFORM_USER' ? '平台' : '代理商'
+            )
+        },
+        {
+          prop: 'agentId',
+          label: '代理商ID',
+          width: 100,
+          sortable: 'custom'
+        },
+        {
+          prop: 'isMaster',
+          label: '主账号',
+          width: 90,
+          formatter: (row: IamAccount) =>
+            row.isMaster ? h(ElTag, { type: 'warning', size: 'small' }, () => '主账号') : h('span')
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          width: 100,
+          sortable: 'custom',
+          formatter: (row: IamAccount) =>
+            h(ElTag, { type: statusTagType(row.status) }, () => statusText(row.status))
+        },
+        {
+          prop: 'operation',
+          label: '操作',
+          width: 90,
+          fixed: 'right',
+          formatter: (row: IamAccount) =>
+            h('div', [
+              h(ArtButtonMore, {
+                list: operationList(row),
+                onClick: (item: ButtonMoreItem) => buttonMoreClick(item, row)
+              })
+            ])
+        }
+      ]
+    }
+  })
+
+  /** 按行状态构造操作项（ArtButtonMore 内置 per-item auth 过滤，无权限项自动隐藏） */
+  function operationList(row: IamAccount): ButtonMoreItem[] {
+    const list: ButtonMoreItem[] = []
+    if (row.status === 'ACTIVE') {
+      list.push({
+        key: 'disable',
+        label: '停用',
+        icon: 'ri:forbid-line',
+        color: '#f56c6c',
+        auth: 'system:account:disable'
+      })
+      list.push({
+        key: 'lock',
+        label: '锁定',
+        icon: 'ri:lock-line',
+        color: '#e6a23c',
+        auth: 'system:account:lock'
+      })
+    }
+    if (row.status === 'DISABLED') {
+      list.push({
+        key: 'enable',
+        label: '启用',
+        icon: 'ri:play-circle-line',
+        color: '#67c23a',
+        auth: 'system:account:enable'
+      })
+    }
+    if (row.status === 'LOCKED') {
+      list.push({
+        key: 'unlock',
+        label: '解锁',
+        icon: 'ri:lock-unlock-line',
+        color: '#67c23a',
+        auth: 'system:account:unlock'
+      })
+    }
+    list.push({
+      key: 'resetPassword',
+      label: '重置密码',
+      icon: 'ri:key-2-line',
+      auth: 'system:account:reset-password'
     })
-  )
+    list.push({
+      key: 'roles',
+      label: '授权角色',
+      icon: 'ri:user-settings-line',
+      auth: 'system:role:assign'
+    })
+    return list
+  }
 
-  async function load() {
-    loading.value = true
-    try {
-      list.value = await iamAccountApi.list()
-    } finally {
-      loading.value = false
+  function buttonMoreClick(item: ButtonMoreItem, row: IamAccount) {
+    switch (item.key) {
+      case 'disable':
+        onDisable(row)
+        break
+      case 'enable':
+        onEnable(row)
+        break
+      case 'lock':
+        onLock(row)
+        break
+      case 'unlock':
+        onUnlock(row)
+        break
+      case 'resetPassword':
+        onResetPassword(row)
+        break
+      case 'roles':
+        openRoles(row)
+        break
     }
   }
 
-  onMounted(load)
+  // ---------- 搜索与排序 ----------
+
+  /** 应用查询：过滤 + 排序整包写入 searchParams（replaceSearchParams 会清空旧过滤键） */
+  function applyQuery() {
+    replaceSearchParams({
+      ...activeFilters.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value
+    })
+    getData()
+  }
+
+  const handleSearch = (params: AccountSearchFormParams) => {
+    activeFilters.value = { ...params }
+    applyQuery()
+  }
+
+  const handleReset = () => {
+    // resetSearchParams 内部会恢复 apiParams 并重新请求；排序态需一并复位
+    sortBy.value = undefined
+    sortOrder.value = undefined
+    activeFilters.value = {}
+    resetSearchParams()
+  }
+
+  /** 服务端排序：sortable:'custom' 列头点击 → sortBy/sortOrder 参数（契约 §1） */
+  const handleSortChange = ({
+    prop,
+    order
+  }: {
+    prop: string
+    order: 'ascending' | 'descending' | null
+  }) => {
+    sortBy.value = order ? prop : undefined
+    sortOrder.value = order === 'ascending' ? 'asc' : order === 'descending' ? 'desc' : undefined
+    applyQuery()
+  }
 
   // ---------- 创建 ----------
+
   const createVisible = ref(false)
   const submitting = ref(false)
   const form = ref({
@@ -238,7 +380,7 @@
       })
       ElMessage.success('创建成功')
       createVisible.value = false
-      await load()
+      refreshData()
     } finally {
       submitting.value = false
     }
@@ -247,14 +389,9 @@
   // ---------- 状态动作 ----------
 
   async function withReload(fn: () => Promise<unknown>, successMsg?: string) {
-    loading.value = true
-    try {
-      await fn()
-      if (successMsg) ElMessage.success(successMsg)
-      await load()
-    } finally {
-      loading.value = false
-    }
+    await fn()
+    if (successMsg) ElMessage.success(successMsg)
+    refreshData()
   }
 
   function onDisable(row: IamAccount) {
@@ -328,7 +465,7 @@
       for (const roleId of toRemove) await iamAccountApi.revokeRole(target, roleId)
       ElMessage.success('已保存')
       rolesVisible.value = false
-      await load()
+      refreshData()
     } finally {
       savingRoles.value = false
     }

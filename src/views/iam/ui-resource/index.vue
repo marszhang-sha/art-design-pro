@@ -1,67 +1,25 @@
 <template>
-  <div class="p-4">
-    <ElCard shadow="never">
-      <div class="mb-4 flex items-center justify-between">
-        <ElAlert
-          title="后端种子先行（003-3）：核心菜单由启动补种创建；本页为调整工具。按钮不转路由，折叠进父页面 meta.authList"
-          type="info"
-          :closable="false"
-          style="flex: 1; margin-right: 16px"
-        />
-        <ElButton v-auth="'system:ui-resource:create'" type="primary" @click="openCreate(null)">
-          新增根节点
-        </ElButton>
-      </div>
+  <div class="art-full-height">
+    <ElCard class="art-table-card" :style="{ 'margin-top': '0' }">
+      <ElAlert
+        class="mb-3"
+        title="后端种子先行（003-3）：核心菜单由启动补种创建；本页为调整工具。按钮不转路由，折叠进父页面 meta.authList"
+        type="info"
+        :closable="false"
+      />
 
-      <ArtTable
-        :data="flat"
-        :loading="loading"
-        border
-        row-key="id"
-        default-expand-all
-        :show-table-header="false"
-      >
-        <ElTableColumn prop="name" label="名称" min-width="200" />
-        <ElTableColumn prop="code" label="标识" min-width="160" />
-        <ElTableColumn label="类型" width="100">
-          <template #default="{ row }">
-            <ElTag :type="row.resourceType === 'MENU' ? 'primary' : 'info'" size="small">
-              {{ row.resourceType }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="绑定权限" min-width="200">
-          <template #default="{ row }">{{ permCode(row.permissionId) ?? '—（目录）' }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="状态" width="90">
-          <template #default="{ row }">
-            <ElTag :type="row.status === 'ACTIVE' ? 'success' : 'info'">
-              {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <ElButton
-              v-if="row.resourceType === 'MENU'"
-              v-auth="'system:ui-resource:create'"
-              link
-              type="primary"
-              @click="openCreate(row.id)"
-            >
-              加子节点
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
+        <template #left>
+          <ElSpace wrap>
+            <ElButton v-auth="'system:ui-resource:create'" type="primary" @click="openCreate(null)">
+              新建资源
             </ElButton>
-            <ElButton
-              v-auth="'system:ui-resource:update'"
-              link
-              type="primary"
-              @click="openEdit(row)"
-            >
-              编辑
-            </ElButton>
-          </template>
-        </ElTableColumn>
-      </ArtTable>
+          </ElSpace>
+        </template>
+      </ArtTableHeader>
+
+      <!-- 全量列表接口：扁平展示（parentId 列保留层级可读性），无服务端分页 -->
+      <ArtTable :loading="loading" :data="data" :columns="columns"> </ArtTable>
     </ElCard>
 
     <!-- 创建/编辑 -->
@@ -128,38 +86,152 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
-  import { ElMessage } from 'element-plus'
+  import { computed, h, onMounted, ref } from 'vue'
+  import { ElMessage, ElTag } from 'element-plus'
+  import { ButtonMoreItem } from '@/components/core/forms/art-button-more/index.vue'
+  import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
+  import { useTable } from '@/hooks/core/useTable'
   import {
     iamPermissionApi,
     iamUiResourceApi,
     type IamPermission,
     type IamUiResource
   } from '@/api/iam'
+  import { wrapAll } from '@/views/iam/table'
 
   defineOptions({ name: 'IamUiResource' })
 
-  const loading = ref(false)
-  const flat = ref<IamUiResource[]>([])
+  // 权限字典（绑定权限列显示与下拉用），随页面挂载加载一次
   const permissions = ref<IamPermission[]>([])
   const activePerms = computed(() => permissions.value.filter((p) => p.status === 'ACTIVE'))
+
+  onMounted(async () => {
+    permissions.value = await iamPermissionApi.list()
+  })
 
   function permCode(permissionId: number | null) {
     if (permissionId == null) return null
     return permissions.value.find((p) => p.id === permissionId)?.code ?? String(permissionId)
   }
 
-  async function load() {
-    loading.value = true
-    try {
-      flat.value = await iamUiResourceApi.list()
-      permissions.value = await iamPermissionApi.list()
-    } finally {
-      loading.value = false
-    }
+  /** 全量列表接口：apiFn 内用 wrapAll 归一为标准信封并显式标注返回类型，
+   *  useTable 的 InferRecordType 才能推出 TRecord = IamUiResource
+   *  （内联箭头函数会退化 TRecord = unknown；responseAdapter 则退化为 never） */
+  function fetchUiResources(): Promise<Api.Common.PaginatedResponse<IamUiResource>> {
+    return iamUiResourceApi.list().then(wrapAll)
   }
 
-  onMounted(load)
+  const { columns, columnChecks, data, loading, refreshData } = useTable({
+    core: {
+      apiFn: fetchUiResources,
+      columnsFactory: () => [
+        {
+          prop: 'code',
+          label: '标识',
+          minWidth: 160,
+          sortable: true
+        },
+        {
+          prop: 'name',
+          label: '名称',
+          minWidth: 200,
+          sortable: true
+        },
+        {
+          prop: 'resourceType',
+          label: '类型',
+          width: 100,
+          sortable: true,
+          formatter: (row: IamUiResource) =>
+            h(ElTag, { type: row.resourceType === 'MENU' ? 'primary' : 'warning' }, () =>
+              row.resourceType === 'MENU' ? '菜单' : '按钮'
+            )
+        },
+        {
+          prop: 'parentId',
+          label: '父节点ID',
+          width: 100,
+          sortable: true,
+          formatter: (row: IamUiResource) => (row.parentId == null ? '—' : String(row.parentId))
+        },
+        {
+          prop: 'route',
+          label: '路由',
+          minWidth: 140,
+          showOverflowTooltip: true,
+          formatter: (row: IamUiResource) => row.route ?? '—'
+        },
+        {
+          prop: 'sortOrder',
+          label: '排序',
+          width: 90,
+          sortable: true
+        },
+        {
+          prop: 'permissionId',
+          label: '绑定权限',
+          minWidth: 200,
+          showOverflowTooltip: true,
+          formatter: (row: IamUiResource) => permCode(row.permissionId) ?? '—（目录）'
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          width: 90,
+          sortable: true,
+          formatter: (row: IamUiResource) =>
+            h(ElTag, { type: row.status === 'ACTIVE' ? 'success' : 'info' }, () =>
+              row.status === 'ACTIVE' ? '启用' : '停用'
+            )
+        },
+        {
+          prop: 'operation',
+          label: '操作',
+          width: 90,
+          fixed: 'right',
+          formatter: (row: IamUiResource) =>
+            h('div', [
+              h(ArtButtonMore, {
+                list: operationList(row),
+                onClick: (item: ButtonMoreItem) => buttonMoreClick(item, row)
+              })
+            ])
+        }
+      ]
+    }
+  })
+
+  /** 按行状态构造操作项（ArtButtonMore 内置 per-item auth 过滤，无权限项自动隐藏）。
+   *  状态启停在编辑弹窗内（走 update 码，ui-resource 无独立状态按钮码） */
+  function operationList(row: IamUiResource): ButtonMoreItem[] {
+    const list: ButtonMoreItem[] = []
+    if (row.resourceType === 'MENU') {
+      list.push({
+        key: 'addChild',
+        label: '加子节点',
+        icon: 'ri:add-line',
+        auth: 'system:ui-resource:create'
+      })
+    }
+    list.push({
+      key: 'edit',
+      label: '编辑',
+      icon: 'ri:edit-2-line',
+      auth: 'system:ui-resource:update'
+    })
+    return list
+  }
+
+  function buttonMoreClick(item: ButtonMoreItem, row: IamUiResource) {
+    switch (item.key) {
+      case 'addChild':
+        openCreate(row.id)
+        break
+      case 'edit':
+        openEdit(row)
+        break
+    }
+  }
 
   // ---------- 创建 / 编辑 ----------
 
@@ -182,7 +254,7 @@
   })
 
   const parentOptions = computed(() =>
-    flat.value
+    data.value
       .filter((n) => n.resourceType === 'MENU' && n.id !== editingId.value)
       .map((n) => ({ value: n.id, label: `${n.name}（${n.code}）` }))
   )
@@ -259,7 +331,7 @@
         ElMessage.success('已创建')
       }
       dialogVisible.value = false
-      await load()
+      refreshData()
     } finally {
       saving.value = false
     }

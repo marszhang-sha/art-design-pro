@@ -1,56 +1,17 @@
 <template>
-  <div class="p-4">
-    <ElCard shadow="never">
-      <div class="mb-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <ElSelect v-model="scopeFilter" placeholder="范围" clearable style="width: 140px">
-            <ElOption label="平台" value="PLATFORM" />
-            <ElOption label="代理商" value="AGENT" />
-          </ElSelect>
-        </div>
-        <ElButton v-auth="'system:role:create'" type="primary" @click="openCreate">
-          创建角色
-        </ElButton>
-      </div>
+  <div class="art-full-height">
+    <ElCard class="art-table-card" :style="{ 'margin-top': '0' }">
+      <ArtTableHeader v-model:columns="columnChecks" :loading="loading" @refresh="refreshData">
+        <template #left>
+          <ElSpace wrap>
+            <ElButton v-auth="'system:role:create'" type="primary" @click="openCreate">
+              创建角色
+            </ElButton>
+          </ElSpace>
+        </template>
+      </ArtTableHeader>
 
-      <ArtTable :data="filtered" :loading="loading" border stripe :show-table-header="false">
-        <ElTableColumn prop="code" label="标识" min-width="150" />
-        <ElTableColumn prop="name" label="名称" min-width="140" />
-        <ElTableColumn label="范围" width="100">
-          <template #default="{ row }">
-            <ElTag :type="row.scope === 'PLATFORM' ? 'danger' : 'primary'">
-              {{ row.scope === 'PLATFORM' ? '平台' : '代理商' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="agentId" label="代理商ID" width="100" />
-        <ElTableColumn label="内置" width="80">
-          <template #default="{ row }">
-            <ElTag v-if="row.builtIn" size="small">内置</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="权限数" width="90">
-          <template #default="{ row }">{{ row.permissionIds.length }}</template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <ElButton
-              v-auth="'system:role:update'"
-              link
-              type="primary"
-              @click="openPermissions(row)"
-            >
-              编辑权限
-            </ElButton>
-            <ElButton v-if="!row.builtIn" v-auth="'system:role:update'" link @click="openEdit(row)">
-              编辑
-            </ElButton>
-            <ElTooltip v-if="row.builtIn" content="内置角色不可删除（BR-IAM-042）" placement="top">
-              <ElButton link disabled>删除</ElButton>
-            </ElTooltip>
-          </template>
-        </ElTableColumn>
-      </ArtTable>
+      <ArtTable :loading="loading" :data="data" :columns="columns"> </ArtTable>
     </ElCard>
 
     <!-- 创建角色 -->
@@ -80,7 +41,7 @@
             placeholder="选择权限（DEPRECATED 灰置）"
           >
             <ElOption
-              v-for="p in selectablePerms"
+              v-for="p in permissions"
               :key="p.id"
               :value="p.id"
               :label="`${p.code}（${p.name}）`"
@@ -110,7 +71,7 @@
       </ElForm>
       <template #footer>
         <ElButton @click="editVisible = false">取消</ElButton>
-        <ElButton type="primary" @click="submitEdit">保存</ElButton>
+        <ElButton type="primary" :loading="submittingEdit" @click="submitEdit">保存</ElButton>
       </template>
     </ElDialog>
 
@@ -131,7 +92,7 @@
         placeholder="选择权限"
       >
         <ElOption
-          v-for="p in selectablePerms"
+          v-for="p in permissions"
           :key="p.id"
           :value="p.id"
           :label="`${p.code}（${p.name}）`"
@@ -146,44 +107,162 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
-  import { ElMessage } from 'element-plus'
+  import { h, onMounted, ref } from 'vue'
+  import { ElMessage, ElTag } from 'element-plus'
+  import { ButtonMoreItem } from '@/components/core/forms/art-button-more/index.vue'
+  import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
+  import { useTable } from '@/hooks/core/useTable'
   import { iamPermissionApi, iamRoleApi, type IamPermission, type IamRole } from '@/api/iam'
+  import { wrapAll } from '@/views/iam/table'
 
   defineOptions({ name: 'IamRole' })
 
-  const loading = ref(false)
-  const list = ref<IamRole[]>([])
-  const scopeFilter = ref('')
+  // 权限全量清单：创建弹窗与权限编辑 Drawer 共用（DEPRECATED 灰置）
   const permissions = ref<IamPermission[]>([])
 
-  const selectablePerms = computed(() => permissions.value)
+  async function loadPermissions() {
+    permissions.value = await iamPermissionApi.list()
+  }
 
-  const filtered = computed(() =>
-    list.value.filter((r) => !scopeFilter.value || r.scope === scopeFilter.value)
-  )
+  onMounted(loadPermissions)
 
-  async function load() {
-    loading.value = true
-    try {
-      list.value = await iamRoleApi.list()
-      permissions.value = await iamPermissionApi.list()
-    } finally {
-      loading.value = false
+  /** 全量列表接口返回裸数组：apiFn 内用 wrapAll 包装为标准信封，
+   *  返回类型显式标注后 useTable 的 InferRecordType 才能推出 TRecord = IamRole
+   *  （内联箭头函数会退化 TRecord = unknown；responseAdapter 则退化为 never） */
+  function fetchRoles(): Promise<Api.Common.PaginatedResponse<IamRole>> {
+    return iamRoleApi.list().then(wrapAll)
+  }
+
+  const { columns, columnChecks, data, loading, refreshData } = useTable({
+    core: {
+      apiFn: fetchRoles,
+      columnsFactory: () => [
+        {
+          prop: 'code',
+          label: '标识',
+          minWidth: 150,
+          sortable: true
+        },
+        {
+          prop: 'name',
+          label: '名称',
+          minWidth: 140,
+          sortable: true
+        },
+        {
+          prop: 'scope',
+          label: '范围',
+          width: 100,
+          sortable: true,
+          formatter: (row: IamRole) =>
+            h(ElTag, { type: row.scope === 'PLATFORM' ? 'danger' : 'primary' }, () =>
+              row.scope === 'PLATFORM' ? '平台' : '代理商'
+            )
+        },
+        {
+          prop: 'agentId',
+          label: '代理商ID',
+          width: 100,
+          sortable: true
+        },
+        {
+          prop: 'builtIn',
+          label: '内置',
+          width: 80,
+          sortable: true,
+          formatter: (row: IamRole) =>
+            row.builtIn ? h(ElTag, { size: 'small' }, () => '内置') : h('span')
+        },
+        {
+          prop: 'status',
+          label: '状态',
+          width: 90,
+          sortable: true,
+          formatter: (row: IamRole) =>
+            h(ElTag, { type: row.status === 'ACTIVE' ? 'success' : 'info' }, () =>
+              row.status === 'ACTIVE' ? '启用' : '停用'
+            )
+        },
+        {
+          prop: 'permissionIds',
+          label: '权限数',
+          width: 90,
+          sortable: true,
+          formatter: (row: IamRole) => `${row.permissionIds.length} 项`
+        },
+        {
+          prop: 'operation',
+          label: '操作',
+          width: 90,
+          fixed: 'right',
+          formatter: (row: IamRole) =>
+            h('div', [
+              h(ArtButtonMore, {
+                list: operationList(row),
+                onClick: (item: ButtonMoreItem) => buttonMoreClick(item, row)
+              })
+            ])
+        }
+      ]
+    }
+  })
+
+  /** 按行状态构造操作项（ArtButtonMore 内置 per-item auth 过滤，无权限项自动隐藏）。
+   *  IAM-3007 语义：内置角色不可编辑基本信息（不出现「编辑」项）；
+   *  「删除」对内置角色为灰置占位（BR-IAM-042），不可触发。 */
+  function operationList(row: IamRole): ButtonMoreItem[] {
+    const list: ButtonMoreItem[] = []
+    list.push({
+      key: 'permissions',
+      label: '编辑权限',
+      icon: 'ri:shield-keyhole-line',
+      auth: 'system:role:update'
+    })
+    if (!row.builtIn) {
+      list.push({
+        key: 'edit',
+        label: '编辑',
+        icon: 'ri:edit-2-line',
+        auth: 'system:role:update'
+      })
+    } else {
+      list.push({
+        key: 'delete',
+        label: '删除',
+        icon: 'ri:delete-bin-4-line',
+        color: '#f56c6c',
+        disabled: true
+      })
+    }
+    return list
+  }
+
+  function buttonMoreClick(item: ButtonMoreItem, row: IamRole) {
+    switch (item.key) {
+      case 'permissions':
+        openPermissions(row)
+        break
+      case 'edit':
+        openEdit(row)
+        break
+      // 'delete' 为内置角色灰置占位项，无操作
     }
   }
 
-  onMounted(load)
+  /** 变更后刷新：旧页 load() 同时重拉角色与权限，此处等价并行刷新 */
+  async function reloadAll() {
+    await Promise.all([refreshData(), loadPermissions()])
+  }
 
   // ---------- 创建 ----------
+
   const createVisible = ref(false)
   const submitting = ref(false)
   const createForm = ref({
     scope: 'PLATFORM' as 'PLATFORM' | 'AGENT',
     agentId: undefined as number | undefined,
     code: '',
-    name: '',
-    builtIn: false
+    name: ''
   })
   const checkedPermIds = ref<number[]>([])
 
@@ -192,8 +271,7 @@
       scope: 'PLATFORM',
       agentId: undefined,
       code: '',
-      name: '',
-      builtIn: false
+      name: ''
     }
     checkedPermIds.value = []
     createVisible.value = true
@@ -211,13 +289,14 @@
       })
       ElMessage.success('创建成功')
       createVisible.value = false
-      await load()
+      await reloadAll()
     } finally {
       submitting.value = false
     }
   }
 
-  // ---------- 编辑 ----------
+  // ---------- 编辑（仅非内置角色可编辑基本信息） ----------
+
   const editVisible = ref(false)
   const submittingEdit = ref(false)
   const editRole = ref<IamRole | null>(null)
@@ -239,13 +318,13 @@
       })
       ElMessage.success('已保存')
       editVisible.value = false
-      await load()
+      await reloadAll()
     } finally {
       submittingEdit.value = false
     }
   }
 
-  // ---------- 权限编辑 Drawer ----------
+  // ---------- 权限编辑 Drawer（内置角色权限集可调，受授权边界约束） ----------
 
   const permVisible = ref(false)
   const savingPerms = ref(false)
@@ -275,7 +354,7 @@
       }
       ElMessage.success('已保存')
       permVisible.value = false
-      await load()
+      await reloadAll()
     } finally {
       savingPerms.value = false
     }
