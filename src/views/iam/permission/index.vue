@@ -279,3 +279,23 @@
       .catch(() => undefined)
   }
 </script>
+
+<style lang="scss" scoped>
+  // ElTabs 默认无高度约束，会打断 .art-table-card → .el-card__body 的高度链，
+  // 导致 .art-table 的 100% 容器高度失效、表格按自然高度渲染被卡片裁剪。
+  // 补齐 tabs → content → pane 的 flex/height 链，启用 ElTable 内部滚动（固定表头 + 表体滚动）。
+  :deep(.el-tabs) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  :deep(.el-tabs__content) {
+    flex: 1;
+    min-height: 0; // 允许收缩，溢出交给内部滚动
+  }
+
+  :deep(.el-tab-pane) {
+    height: 100%;
+  }
+</style>
