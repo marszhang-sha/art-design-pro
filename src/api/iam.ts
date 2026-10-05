@@ -530,3 +530,123 @@ export const iamUiResourceApi = {
     return request.get<IamUiResource[]>({ url: `${BASE}/ui-resources/tree` })
   }
 }
+
+// ---------- 组织节点（契约 §3.7，v0.5） ----------
+
+export type IamOrgNodeType = 'PHARMA' | 'BUSINESS_ENTITY' | 'CSO_AGENT'
+
+export interface IamOrgNode {
+  id: number
+  nodeType: IamOrgNodeType
+  code: string
+  name: string
+  shortName: string
+  uscc: string
+  registeredAddress: string
+  contactPerson: string
+  contactPhone: string
+  registeredCapital: number // 万元（BE NUMERIC(14,2) → 数值出参）
+  legalRepresentative: string
+  establishedDate: string // ISO 日期
+  attributes: Record<string, unknown> | null
+  status: 'ACTIVE' | 'DISABLED'
+  parentId: number | null
+  children?: IamOrgNode[]
+}
+
+export interface IamOrgListParams {
+  nodeType?: IamOrgNodeType
+  status?: 'ACTIVE' | 'DISABLED'
+  keyword?: string // code/name/shortName 模糊
+}
+
+/** 基础信息九项 + code（ORG-07）；nodeType/parentId 不可经 API 提交（出现即 400 IAM-4001） */
+export interface IamOrgPayload {
+  code: string
+  name: string
+  shortName: string
+  uscc: string
+  registeredAddress: string
+  contactPerson: string
+  contactPhone: string
+  registeredCapital: number
+  legalRepresentative: string
+  establishedDate: string
+  attributes?: Record<string, unknown>
+}
+
+export const iamOrgApi = {
+  /** 树形全量（不分页）；PHARMA.children=业务实体，CSO_AGENT 恒空 */
+  tree(params?: IamOrgListParams) {
+    return request.get<IamOrgNode[]>({ url: `${BASE}/orgs`, params })
+  },
+  get(id: number) {
+    return request.get<IamOrgNode>({ url: `${BASE}/orgs/${id}` })
+  },
+  create(nodeType: 'BUSINESS_ENTITY' | 'CSO_AGENT', payload: IamOrgPayload) {
+    return request.post<IamOrgNode>({ url: `${BASE}/orgs`, params: { nodeType, ...payload } })
+  },
+  update(id: number, payload: Partial<IamOrgPayload>) {
+    return request.patch<IamOrgNode>({ url: `${BASE}/orgs/${id}`, params: payload })
+  },
+  disable(id: number) {
+    return request.post<IamOrgNode>({ url: `${BASE}/orgs/${id}/disable` })
+  },
+  enable(id: number) {
+    return request.post<IamOrgNode>({ url: `${BASE}/orgs/${id}/enable` })
+  }
+}
+
+// ---------- 员工（契约 §3.8，v0.5.1） ----------
+
+export interface IamEmployee {
+  id: number
+  employeeNo: string
+  name: string
+  orgNodeId: number
+  attributes: Record<string, unknown> | null
+  employmentStatus: 'ACTIVE' | 'TERMINATED'
+}
+
+export interface IamEmployeeListParams {
+  orgNodeId?: number
+  employmentStatus?: 'ACTIVE' | 'TERMINATED'
+  keyword?: string // employeeNo/name 模糊
+  sortBy?: 'id' | 'employeeNo' | 'name' | 'orgNodeId' | 'employmentStatus' | 'createdAt'
+  sortOrder?: IamSortOrder
+  page?: number
+  size?: number
+}
+
+export const iamEmployeeApi = {
+  list(params?: IamEmployeeListParams) {
+    return request.get<IamPage<IamEmployee>>({ url: `${BASE}/employees`, params })
+  },
+  get(id: number) {
+    return request.get<IamEmployee>({ url: `${BASE}/employees/${id}` })
+  },
+  create(payload: {
+    employeeNo: string
+    name: string
+    orgNodeId: number
+    attributes?: Record<string, unknown>
+  }) {
+    return request.post<IamEmployee>({ url: `${BASE}/employees`, params: payload })
+  },
+  /** 仅 ACTIVE 可变更（TERMINATED 终态 409 IAM-5002）；employeeNo 不可改；转挂同事务联动账号归属（ACC-08） */
+  update(
+    id: number,
+    payload: { name?: string; orgNodeId?: number; attributes?: Record<string, unknown> }
+  ) {
+    return request.patch<IamEmployee>({ url: `${BASE}/employees/${id}`, params: payload })
+  },
+  /** EMP-01 同步联动：同事务置 TERMINATED 并停用关联平台账号；响应含 cascadedAccounts */
+  terminate(id: number) {
+    return request.post<{
+      employee: IamEmployee
+      cascadedAccounts: { id: number; status: string }[]
+    }>({
+      url: `${BASE}/employees/${id}/termination`
+    })
+  }
+}
