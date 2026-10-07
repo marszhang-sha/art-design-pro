@@ -1,6 +1,6 @@
 <template>
   <!-- UI-IAM-003 工作台（无码公共页，sortOrder 全树最小 = 登录落地页）：
-       欢迎头部 / 公告 feed 主区 / 通知摘要卡片 / 快捷入口卡片。只读既有 API，无新后端端点。 -->
+       欢迎头部 / 公告 feed 主区 / 通知摘要卡片 / 快捷入口卡片 / 最新资料卡片。只读既有 API，无新后端端点。 -->
   <div class="workbench p-4">
     <!-- ① 欢迎头部 -->
     <ElCard shadow="never" class="mb-4">
@@ -74,6 +74,50 @@
               </div>
             </template>
             <ElEmpty v-else-if="!feedLoading" description="暂无公告" :image-size="80" />
+          </div>
+        </ElCard>
+
+        <!-- ⑤ 最新资料：代理商可见最新 10 条（GET /me/materials，默认 createdAt desc）；
+             点行/「查看」就地弹详情抽屉，「更多资料」进资料库 -->
+        <ElCard shadow="never" class="mt-4">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <span class="font-medium">最新资料</span>
+              <ElLink type="primary" :underline="false" @click="goLibrary()">
+                更多资料
+                <ArtSvgIcon icon="ri:arrow-right-s-line" />
+              </ElLink>
+            </div>
+          </template>
+
+          <div v-loading="matLoading">
+            <template v-if="matError">
+              <ElResult icon="error" title="最新资料加载失败">
+                <template #extra>
+                  <ElButton type="primary" @click="loadLatestMaterials">重试</ElButton>
+                </template>
+              </ElResult>
+            </template>
+            <template v-else-if="matItems.length">
+              <div class="grid grid-cols-2 gap-x-6 max-sm:grid-cols-1">
+                <div v-for="m in matItems" :key="m.id" class="mat-item" @click="openMatDetail(m)">
+                  <span class="min-w-0 flex-1 truncate text-sm font-medium" :title="m.name">{{
+                    m.name
+                  }}</span>
+                  <span class="shrink-0 text-xs text-gray-400">
+                    {{ dimensionLabel(m.buId, m.productLineId) }}
+                    <span class="mx-1">·</span>
+                    {{ m.currentVersion ? `v${m.currentVersion.versionNo}` : '—' }}
+                    <span class="mx-1">·</span>
+                    {{ formatDateTime(m.createdAt) }}
+                  </span>
+                  <ElButton link type="primary" class="shrink-0" @click.stop="openMatDetail(m)"
+                    >查看</ElButton
+                  >
+                </div>
+              </div>
+            </template>
+            <ElEmpty v-else-if="!matLoading" description="暂无资料" :image-size="60" />
           </div>
         </ElCard>
       </ElCol>
@@ -153,6 +197,9 @@
       </ElCol>
     </ElRow>
 
+    <!-- 资料详情抽屉（与资料库共用组件）：预览 + 版本链 + 下载 -->
+    <MaterialDetailDrawer v-model="matDetailVisible" :material-id="matDetailId" />
+
     <!-- 公告详情抽屉（与通知中心共用组件）：打开即标已读并回刷红点 -->
     <AncAnnouncementDetail
       v-model="drawerVisible"
@@ -170,6 +217,8 @@
   import { iamAuthApi, type IamAccount } from '@/api/iam'
   import { ancApi, type AncMyAnnouncementItem } from '@/api/anc'
   import { ntfApi, type NtfInboxEntry, type NtfSourceType } from '@/api/ntf'
+  import { pmMyApi, PM_DIMENSIONS_PLACEHOLDER, type PmMaterialListItem } from '@/api/pm'
+  import MaterialDetailDrawer from '@/views/pm/components/material-detail-drawer.vue'
   import { useMenuStore } from '@/store/modules/menu'
   import AncAnnouncementDetail from '@/components/business/anc-announcement-detail/index.vue'
   import { useNtfUnread } from '@/components/business/notification-bell/use-ntf-unread'
@@ -372,6 +421,44 @@
     return QUICK_ENTRY_CANDIDATES.filter((c) => visible.has(c.path))
   })
 
+  // ---------- ⑤ 最新资料（GET /me/materials，最新 10 条；默认排序 createdAt desc） ----------
+
+  const MAT_LATEST_SIZE = 10
+  const matLoading = ref(false)
+  const matError = ref(false)
+  const matItems = ref<PmMaterialListItem[]>([])
+
+  async function loadLatestMaterials() {
+    matLoading.value = true
+    matError.value = false
+    try {
+      const page = await pmMyApi.list({ page: 1, size: MAT_LATEST_SIZE })
+      matItems.value = page.items
+    } catch {
+      matError.value = true
+    } finally {
+      matLoading.value = false
+    }
+  }
+
+  /** BU/产品线 id → 占位名称（与资料库页同源映射；id 空间独立各查各域，未命中兜底「未知(id)」） */
+  function buName(id: string | number): string {
+    return PM_DIMENSIONS_PLACEHOLDER.find((b) => b.id === Number(id))?.name ?? `未知(${id})`
+  }
+
+  function plName(id: string | number): string {
+    const num = Number(id)
+    for (const b of PM_DIMENSIONS_PLACEHOLDER) {
+      const pl = b.productLines.find((p) => p.id === num)
+      if (pl) return pl.name
+    }
+    return `未知(${id})`
+  }
+
+  function dimensionLabel(buId: string, productLineId: string): string {
+    return `${buName(buId)} / ${plName(productLineId)}`
+  }
+
   // ---------- 公告详情抽屉 ----------
 
   const drawerVisible = ref(false)
@@ -393,6 +480,20 @@
     router.push('/ntf/notifications')
   }
 
+  /** 更多资料 → 代理商资料库 */
+  function goLibrary() {
+    router.push('/pm/library')
+  }
+
+  // 最新资料：就地弹详情抽屉（与资料库共用组件）
+  const matDetailVisible = ref(false)
+  const matDetailId = ref<string | null>(null)
+
+  function openMatDetail(item: PmMaterialListItem) {
+    matDetailId.value = item.id
+    matDetailVisible.value = true
+  }
+
   function formatDateTime(iso: string | null): string {
     if (!iso) return '—'
     const d = new Date(iso)
@@ -408,6 +509,7 @@
     loadWeather() // 天气失败同样静默，不阻塞页面
     loadFeed()
     loadNtfSummary()
+    loadLatestMaterials()
     refresh()
   })
 </script>
@@ -441,6 +543,24 @@
     padding: 8px 4px;
 
     &.c-p:hover {
+      background: var(--el-fill-color-light);
+    }
+  }
+
+  .mat-item {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px 8px;
+    align-items: center;
+    padding: 4px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--el-border-color-extra-light);
+
+    &:last-of-type {
+      border-bottom: none;
+    }
+
+    &:hover {
       background: var(--el-fill-color-light);
     }
   }
