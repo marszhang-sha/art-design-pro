@@ -15,8 +15,10 @@
     </div>
 
     <RouterView v-if="isRefresh" v-slot="{ Component, route }" :style="contentStyle">
-      <!-- 缓存路由动画 -->
-      <Transition :name="showTransitionMask ? '' : actualTransition" mode="out-in" appear>
+      <!-- 缓存路由动画：禁用 out-in——T20 页（工作台/公告/通知）离开时元素被立即
+           移入 KeepAlive 储存容器，transitionend 永不触发，out-in 武装的 afterLeave
+           随之永不执行，isLeaving 卡死渲染空占位（主区白屏）。详见 T22 -->
+      <Transition :name="showTransitionMask ? '' : actualTransition" appear>
         <KeepAlive :max="10" :exclude="keepAliveExclude">
           <component
             class="art-page-view"
