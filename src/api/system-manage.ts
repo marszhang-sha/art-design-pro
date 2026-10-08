@@ -36,6 +36,8 @@ export function fetchGetMenuList() {
   // 图标名 → 模板惯例 Iconify ri:*（Remix）映射；未命中不渲染（ArtSvgIcon 对空 icon 不渲染）
   const ICON_MAP: Record<string, string> = {
     home: 'ri:home-5-line',
+    folder: 'ri:folder-3-line',
+    'folder-opened': 'ri:folder-open-line',
     'office-building': 'ri:building-2-line',
     bell: 'ri:notification-4-line',
     notification: 'ri:megaphone-line',

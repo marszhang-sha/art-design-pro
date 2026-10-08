@@ -99,16 +99,21 @@
               </ElResult>
             </template>
             <template v-else-if="matItems.length">
-              <div class="grid grid-cols-2 gap-x-6 max-sm:grid-cols-1">
+              <div class="grid grid-cols-1">
                 <div v-for="m in matItems" :key="m.id" class="mat-item" @click="openMatDetail(m)">
-                  <span class="min-w-0 flex-1 truncate text-sm font-medium" :title="m.name">{{
+                  <span class="min-w-0 flex-[2] truncate text-sm font-medium" :title="m.name">{{
                     m.name
                   }}</span>
-                  <span class="shrink-0 text-xs text-gray-400">
+                  <span
+                    class="min-w-0 flex-1 truncate text-xs text-gray-400"
+                    :title="dimensionLabel(m.buId, m.productLineId)"
+                  >
                     {{ dimensionLabel(m.buId, m.productLineId) }}
-                    <span class="mx-1">·</span>
+                  </span>
+                  <span class="flex-1 text-xs text-gray-400">
                     {{ m.currentVersion ? `v${m.currentVersion.versionNo}` : '—' }}
-                    <span class="mx-1">·</span>
+                  </span>
+                  <span class="min-w-0 flex-1 truncate text-right text-xs text-gray-400">
                     {{ formatDateTime(m.createdAt) }}
                   </span>
                   <ElButton link type="primary" class="shrink-0" @click.stop="openMatDetail(m)"

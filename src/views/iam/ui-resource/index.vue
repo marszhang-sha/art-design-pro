@@ -67,6 +67,13 @@
         <ElFormItem label="路由">
           <ElInput v-model="form.route" placeholder="如 /iam/account" />
         </ElFormItem>
+        <ElFormItem label="图标">
+          <ElInput
+            v-model="form.icon"
+            placeholder="图标名（如 folder、bell、ri:home-4-line），留空不显示"
+            clearable
+          />
+        </ElFormItem>
         <ElFormItem label="排序">
           <ElInputNumber v-model="form.sortOrder" :min="0" />
         </ElFormItem>
@@ -91,6 +98,7 @@
   import { ButtonMoreItem } from '@/components/core/forms/art-button-more/index.vue'
   import ArtButtonMore from '@/components/core/forms/art-button-more/index.vue'
   import { useTable } from '@/hooks/core/useTable'
+  import ArtSvgIcon from '@/components/core/base/art-svg-icon/index.vue'
   import {
     iamPermissionApi,
     iamUiResourceApi,
@@ -136,6 +144,19 @@
           label: '名称',
           minWidth: 200,
           sortable: true
+        },
+        {
+          prop: 'icon',
+          label: '图标',
+          width: 150,
+          showOverflowTooltip: true,
+          formatter: (row: IamUiResource) =>
+            row.icon
+              ? h('div', { class: 'flex items-center gap-1.5' }, [
+                  h(ArtSvgIcon, { icon: row.icon, class: 'text-base' }),
+                  h('span', { class: 'text-xs text-gray-400' }, row.icon)
+                ])
+              : '—'
         },
         {
           prop: 'resourceType',
