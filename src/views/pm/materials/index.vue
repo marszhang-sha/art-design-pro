@@ -3,7 +3,7 @@
        左侧分类树（全树含停用灰显，节点维护挂 system:material:category）
        右侧 Tabs：资料库（列表/上传/版本链）· 下载统计（三维度聚合，挂 system:material:report）
        布局：根被布局层强制 .art-page-view 纵向，树/Tabs 包内层 flex 行容器实现左右结构 -->
-  <div class="art-full-height art-page-view">
+  <div class="art-full-height">
     <div class="flex gap-3 min-w-0 flex-1" style="align-items: stretch">
       <!-- ── 左：分类树面板 ── -->
       <ElCard class="w-72 shrink-0" shadow="never">
@@ -64,97 +64,104 @@
         </ElTree>
       </ElCard>
 
-      <!-- ── 右：Tabs ── -->
-      <ElCard class="art-table-card min-w-0 flex-1" shadow="never" :style="{ 'margin-top': '0' }">
-        <ElTabs v-model="activeTab">
-          <!-- 资料库 Tab -->
-          <ElTabPane label="资料库" name="materials">
-            <ArtSearchBar
-              v-model="searchForm"
-              :items="searchItems"
-              @search="handleSearch"
-              @reset="handleReset"
-            />
-            <ArtTableHeader
-              v-model:columns="columnChecks"
-              v-model:showSearchBar="showSearchBar"
-              :loading="loading"
-              @refresh="refreshData"
-            >
-              <template #left>
-                <ElButton v-auth="'system:material:upload'" type="primary" @click="openUpload"
-                  >上传资料</ElButton
-                >
-              </template>
-            </ArtTableHeader>
-            <ArtTable
-              :loading="loading"
-              :data="data"
-              :columns="columns"
-              :pagination="pagination"
-              empty-text="暂无资料"
-              @pagination:size-change="handleSizeChange"
-              @pagination:current-change="handleCurrentChange"
-              @sort-change="handleSortChange"
-            />
-          </ElTabPane>
+      <!-- ── 右：搜索（标准：独立卡外，资料库 Tab 生效）+ Tabs ── -->
+      <div class="min-w-0 flex-1 flex flex-col">
+        <ArtSearchBar
+          v-show="showSearchBar && activeTab === 'materials'"
+          v-model="searchForm"
+          :items="searchItems"
+          @search="handleSearch"
+          @reset="handleReset"
+        />
+        <ElCard
+          class="art-table-card min-w-0 flex-1"
+          shadow="never"
+          :style="{ 'margin-top': showSearchBar && activeTab === 'materials' ? '12px' : '0' }"
+        >
+          <ElTabs v-model="activeTab">
+            <!-- 资料库 Tab -->
+            <ElTabPane label="资料库" name="materials">
+              <ArtTableHeader
+                v-model:columns="columnChecks"
+                v-model:showSearchBar="showSearchBar"
+                :loading="loading"
+                @refresh="refreshData"
+              >
+                <template #left>
+                  <ElButton v-auth="'system:material:upload'" type="primary" @click="openUpload"
+                    >上传资料</ElButton
+                  >
+                </template>
+              </ArtTableHeader>
+              <ArtTable
+                :loading="loading"
+                :data="data"
+                :columns="columns"
+                :pagination="pagination"
+                empty-text="暂无资料"
+                @pagination:size-change="handleSizeChange"
+                @pagination:current-change="handleCurrentChange"
+                @sort-change="handleSortChange"
+              />
+            </ElTabPane>
 
-          <!-- 下载统计 Tab -->
-          <ElTabPane v-auth="'system:material:report'" label="下载统计" name="stats">
-            <ElForm inline class="mb-3">
-              <ElFormItem label="维度">
-                <ElRadioGroup v-model="stats.dimension" @change="fetchStats">
-                  <ElRadioButton value="BU">BU</ElRadioButton>
-                  <ElRadioButton value="PRODUCT_LINE">产品线</ElRadioButton>
-                  <ElRadioButton value="MATERIAL">资料</ElRadioButton>
-                </ElRadioGroup>
-              </ElFormItem>
-              <ElFormItem v-if="stats.dimension !== 'BU'" label="BU">
-                <ElSelect
-                  v-model="stats.buId"
-                  clearable
-                  placeholder="全部"
-                  class="w-36"
-                  @change="onStatsBuChange"
-                >
-                  <ElOption
-                    v-for="b in PM_DIMENSIONS_PLACEHOLDER"
-                    :key="b.id"
-                    :label="b.name"
-                    :value="b.id"
+            <!-- 下载统计 Tab -->
+            <ElTabPane v-auth="'system:material:report'" label="下载统计" name="stats">
+              <ElForm inline class="mb-3">
+                <ElFormItem label="维度">
+                  <ElRadioGroup v-model="stats.dimension" @change="fetchStats">
+                    <ElRadioButton value="BU">BU</ElRadioButton>
+                    <ElRadioButton value="PRODUCT_LINE">产品线</ElRadioButton>
+                    <ElRadioButton value="MATERIAL">资料</ElRadioButton>
+                  </ElRadioGroup>
+                </ElFormItem>
+                <ElFormItem v-if="stats.dimension !== 'BU'" label="BU">
+                  <ElSelect
+                    v-model="stats.buId"
+                    clearable
+                    placeholder="全部"
+                    class="w-36"
+                    @change="onStatsBuChange"
+                  >
+                    <ElOption
+                      v-for="b in PM_DIMENSIONS_PLACEHOLDER"
+                      :key="b.id"
+                      :label="b.name"
+                      :value="b.id"
+                    />
+                  </ElSelect>
+                </ElFormItem>
+                <ElFormItem v-if="stats.dimension === 'MATERIAL'" label="产品线">
+                  <ElSelect v-model="stats.productLineId" clearable placeholder="全部" class="w-40">
+                    <ElOption
+                      v-for="pl in statsProductLines"
+                      :key="pl.id"
+                      :label="pl.name"
+                      :value="pl.id"
+                    />
+                  </ElSelect>
+                </ElFormItem>
+                <ElFormItem label="日期">
+                  <ElDatePicker
+                    v-model="stats.range"
+                    type="daterange"
+                    value-format="YYYY-MM-DD"
+                    start-placeholder="开始"
+                    end-placeholder="结束"
                   />
-                </ElSelect>
-              </ElFormItem>
-              <ElFormItem v-if="stats.dimension === 'MATERIAL'" label="产品线">
-                <ElSelect v-model="stats.productLineId" clearable placeholder="全部" class="w-40">
-                  <ElOption
-                    v-for="pl in statsProductLines"
-                    :key="pl.id"
-                    :label="pl.name"
-                    :value="pl.id"
-                  />
-                </ElSelect>
-              </ElFormItem>
-              <ElFormItem label="日期">
-                <ElDatePicker
-                  v-model="stats.range"
-                  type="daterange"
-                  value-format="YYYY-MM-DD"
-                  start-placeholder="开始"
-                  end-placeholder="结束"
-                />
-              </ElFormItem>
-              <ElFormItem>
-                <ElButton type="primary" @click="fetchStats">查询</ElButton>
-              </ElFormItem>
-            </ElForm>
-            <ElTable :data="stats.rows" v-loading="stats.loading" empty-text="暂无下载记录">
-              <ElTableColumn prop="name" :label="statsNameLabel" min-width="200" />
-              <ElTableColumn prop="downloadCount" label="下载次数" width="140" />
-            </ElTable>
-          </ElTabPane>
-        </ElTabs>
-      </ElCard>
+                </ElFormItem>
+                <ElFormItem>
+                  <ElButton type="primary" @click="fetchStats">查询</ElButton>
+                </ElFormItem>
+              </ElForm>
+              <ElTable :data="stats.rows" v-loading="stats.loading" empty-text="暂无下载记录">
+                <ElTableColumn prop="name" :label="statsNameLabel" min-width="200" />
+                <ElTableColumn prop="downloadCount" label="下载次数" width="140" />
+              </ElTable>
+            </ElTabPane>
+          </ElTabs>
+        </ElCard>
+      </div>
     </div>
 
     <!-- ── 上传 Drawer ── -->

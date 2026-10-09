@@ -2,7 +2,7 @@
   <!-- UI-PM-002 代理商资料库（登录即可，无权限码）：
        ACTIVE 树（G2-PM-1）+ BU/产品线/关键词交集筛选（BR-PM-011）+ 列表 + 详情（版本链/预览/下载）
        布局：根被布局层强制 .art-page-view 纵向，故树/表包内层 flex 行容器实现左右结构 -->
-  <div class="art-full-height art-page-view">
+  <div class="art-full-height">
     <div class="flex gap-3 min-w-0 flex-1" style="align-items: stretch">
       <!-- ── 左：分类树（仅 ACTIVE，G2-PM-1 甲）── -->
       <ElCard class="w-64 shrink-0" shadow="never">
@@ -18,31 +18,38 @@
         />
       </ElCard>
 
-      <!-- ── 右：列表 ── -->
-      <ElCard class="art-table-card min-w-0 flex-1" shadow="never" :style="{ 'margin-top': '0' }">
+      <!-- ── 右：搜索（标准：独立卡外，v-show 联动）+ 列表 ── -->
+      <div class="min-w-0 flex-1 flex flex-col">
         <ArtSearchBar
+          v-show="showSearchBar"
           v-model="searchForm"
           :items="searchItems"
           @search="handleSearch"
           @reset="handleReset"
         />
-        <ArtTableHeader
-          v-model:columns="columnChecks"
-          v-model:showSearchBar="showSearchBar"
-          :loading="loading"
-          @refresh="refreshData"
-        />
-        <ArtTable
-          :loading="loading"
-          :data="data"
-          :columns="columns"
-          :pagination="pagination"
-          empty-text="暂无资料"
-          @pagination:size-change="handleSizeChange"
-          @pagination:current-change="handleCurrentChange"
-          @sort-change="handleSortChange"
-        />
-      </ElCard>
+        <ElCard
+          class="art-table-card min-w-0 flex-1"
+          shadow="never"
+          :style="{ 'margin-top': showSearchBar ? '12px' : '0' }"
+        >
+          <ArtTableHeader
+            v-model:columns="columnChecks"
+            v-model:showSearchBar="showSearchBar"
+            :loading="loading"
+            @refresh="refreshData"
+          />
+          <ArtTable
+            :loading="loading"
+            :data="data"
+            :columns="columns"
+            :pagination="pagination"
+            empty-text="暂无资料"
+            @pagination:size-change="handleSizeChange"
+            @pagination:current-change="handleCurrentChange"
+            @sort-change="handleSortChange"
+          />
+        </ElCard>
+      </div>
     </div>
 
     <!-- ── 详情 Drawer（共用组件）：预览 + 版本链 + 下载 ── -->

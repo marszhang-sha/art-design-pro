@@ -1,57 +1,37 @@
 <template>
   <div class="art-full-height">
     <ArtSearchBar
+      v-show="showSearchBar"
       v-model="searchForm"
       :items="formItems"
       @search="handleSearch"
       @reset="handleReset"
     />
 
-    <ElCard class="art-table-card" style="margin-top: 12px">
-      <div class="mb-3 flex justify-end">
-        <ElButton v-auth="'system:org:create'" type="primary" @click="openCreate">
-          新建节点
-        </ElButton>
-      </div>
+    <ElCard class="art-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
+      <ArtTableHeader
+        v-model:columns="columnChecks"
+        v-model:showSearchBar="showSearchBar"
+        :loading="loading"
+        @refresh="getData"
+      >
+        <template #left>
+          <ElButton v-auth="'system:org:create'" type="primary" @click="openCreate">
+            新建节点
+          </ElButton>
+        </template>
+      </ArtTableHeader>
 
       <!-- 树表：GET /orgs 全量不分页（契约 §3.7），树形 + 默认展开 -->
-      <ElTable
+      <ArtTable
         v-loading="loading"
         :data="treeData"
+        :columns="columns"
         row-key="id"
         :tree-props="{ children: 'children' }"
         default-expand-all
-        border
         empty-text="组织节点为空，请检查种子数据"
-      >
-        <ElTableColumn prop="name" label="组织名称" min-width="220" />
-        <ElTableColumn label="类型" width="110">
-          <template #default="{ row }: { row: IamOrgNode }">
-            <ElTag :type="NODE_TYPE_TAG[row.nodeType]">{{ NODE_TYPE_TEXT[row.nodeType] }}</ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="code" label="编码" min-width="130" />
-        <ElTableColumn prop="shortName" label="简称" min-width="110" />
-        <ElTableColumn prop="uscc" label="统一社会信用代码" min-width="180" />
-        <ElTableColumn prop="contactPerson" label="联系人" width="100" />
-        <ElTableColumn prop="contactPhone" label="联系电话" width="130" />
-        <ElTableColumn prop="establishedDate" label="成立日期" width="110" />
-        <ElTableColumn label="状态" width="90">
-          <template #default="{ row }: { row: IamOrgNode }">
-            <ElTag :type="row.status === 'ACTIVE' ? 'success' : 'danger'">
-              {{ row.status === 'ACTIVE' ? '正常' : '已停用' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="90" fixed="right">
-          <template #default="{ row }: { row: IamOrgNode }">
-            <ArtButtonMore
-              :list="operationList(row)"
-              @click="(item: ButtonMoreItem) => buttonMoreClick(item, row)"
-            />
-          </template>
-        </ElTableColumn>
-      </ElTable>
+      />
     </ElCard>
 
     <!-- 新建/编辑 Drawer：九项必填（ORG-07）+ code + attributes；
@@ -121,7 +101,10 @@
 </template>
 
 <script setup lang="ts">
-  import { onMounted, ref } from 'vue'
+  import { h, onMounted, ref } from 'vue'
+  import { ElTag } from 'element-plus'
+  import { useTableColumns } from '@/hooks/core/useTableColumns'
+
   import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
   import ArtButtonMore, {
     type ButtonMoreItem
@@ -423,4 +406,52 @@
       submitting.value = false
     }
   }
+
+  // ── 标准表格栈（ArtTableHeader + ArtTable；树表全量不分页，契约 §3.7）──
+
+  const showSearchBar = ref(true)
+  const getData = fetchTree
+
+  const { columns, columnChecks } = useTableColumns(() => [
+    { prop: 'name', label: '组织名称', minWidth: 220 },
+    {
+      prop: 'nodeType',
+      label: '类型',
+      width: 110,
+      formatter: (row: IamOrgNode) =>
+        h(ElTag, { type: NODE_TYPE_TAG[row.nodeType] }, () => NODE_TYPE_TEXT[row.nodeType])
+    },
+    { prop: 'code', label: '编码', minWidth: 130 },
+    { prop: 'shortName', label: '简称', minWidth: 110 },
+    { prop: 'uscc', label: '统一社会信用代码', minWidth: 180 },
+    { prop: 'contactPerson', label: '联系人', width: 100 },
+    { prop: 'contactPhone', label: '联系电话', width: 130 },
+    { prop: 'establishedDate', label: '成立日期', width: 110 },
+    {
+      prop: 'status',
+      label: '状态',
+      width: 90,
+      formatter: (row: IamOrgNode) =>
+        h(ElTag, { type: row.status === 'ACTIVE' ? 'success' : 'danger' }, () =>
+          row.status === 'ACTIVE' ? '正常' : '已停用'
+        )
+    },
+    {
+      prop: 'operation',
+      label: '操作',
+      width: 90,
+      fixed: 'right',
+      formatter: (row: IamOrgNode) =>
+        h('div', [
+          h(ArtButtonMore, {
+            list: operationList(row),
+            onClick: (item: ButtonMoreItem) => buttonMoreClick(item, row)
+          })
+        ])
+    }
+  ])
 </script>
+
+<style scoped>
+  /* 组织树表占满卡内剩余空间（ArtTable 高度自算补偿表头/按钮行） */
+</style>
