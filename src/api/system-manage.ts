@@ -42,7 +42,8 @@ export function fetchGetMenuList() {
     bell: 'ri:notification-4-line',
     notification: 'ri:megaphone-line',
     setting: 'ri:settings-4-line',
-    user: 'ri:user-3-line'
+    user: 'ri:user-3-line',
+    database: 'ri:database-2-line'
   }
 
   // component 解析：载荷 component 优先（相对 src/views 的视图路径）；
