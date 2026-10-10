@@ -96,7 +96,7 @@
       paginationKey: { current: 'page', size: 'size' },
       columnsFactory: () => [
         { prop: 'theDate', label: '日期', width: 110 },
-        { prop: 'weekDay', label: '星期', width: 90 },
+        { prop: 'weekDay', label: '星期', minWidth: 90 },
         {
           prop: 'isHoliday',
           label: '休息日',
@@ -109,25 +109,25 @@
         {
           prop: 'isMonthlyReportDate',
           label: '月报日',
-          width: 90,
+          minWidth: 90,
           formatter: (r: MdWorkCalendarRow) => boolFormatter(r.isMonthlyReportDate)
         },
         {
           prop: 'isSalesAppealDate',
           label: '申诉日',
-          width: 90,
+          minWidth: 90,
           formatter: (r: MdWorkCalendarRow) => boolFormatter(r.isSalesAppealDate)
         },
         {
           prop: 'monthWorkDay',
           label: '月内工作日',
-          width: 110,
+          minWidth: 110,
           formatter: (r: MdWorkCalendarRow) => r.monthWorkDay ?? '—'
         },
         {
           prop: 'quarterWorkDay',
           label: '季内工作日',
-          width: 110,
+          minWidth: 110,
           formatter: (r: MdWorkCalendarRow) => r.quarterWorkDay ?? '—'
         },
         {

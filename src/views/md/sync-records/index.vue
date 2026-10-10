@@ -130,13 +130,13 @@
         {
           prop: 'startedAt',
           label: '开始',
-          width: 170,
+          minWidth: 170,
           formatter: (r: MdSyncBatch) => formatDateTime(r.startedAt)
         },
         {
           prop: 'finishedAt',
           label: '结束',
-          width: 170,
+          minWidth: 170,
           formatter: (r: MdSyncBatch) => formatDateTime(r.finishedAt)
         },
         { prop: 'totalRows', label: '总行数', width: 90 },

@@ -178,9 +178,12 @@ export interface MdTerritoryParams {
   page?: number
   size?: number
   yyyymm?: string
-  level?: 'PROVINCE' | 'CITY' | 'COUNTY'
+  level?: string
   buCode?: string
   staffCode?: string
+  terrName?: string
+  terrCode?: string
+  upperTerrCode?: string
   keyword?: string
   status?: MdStatus
   sortBy?: 'terrCode' | 'terrName'
