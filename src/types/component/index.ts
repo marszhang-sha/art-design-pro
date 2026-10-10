@@ -67,6 +67,14 @@ export interface ColumnOption<T = any> {
   filterMethod?: (value: any, row: any) => boolean
   // 过滤器位置
   filterPlacement?: string
+  // 动态查询条件元数据（T29：列驱动自由增删查询条件；param=筛选参数名与 prop 不同名时的别名）
+  search?: {
+    type: 'input' | 'select' | 'daterange'
+    param?: string
+    label?: string
+    default?: boolean
+    props?: Record<string, any> | (() => Record<string, any>)
+  }
   // 是否禁用
   disabled?: boolean
   // 是否显示列
