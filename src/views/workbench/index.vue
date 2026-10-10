@@ -24,6 +24,24 @@
       </div>
     </ElCard>
 
+    <!-- ②a 快捷入口：按菜单可见性过滤；无可见项整卡隐藏（横排，移至欢迎卡下） -->
+    <ElCard v-if="quickEntries.length" shadow="never" class="mb-4">
+      <template #header>
+        <span class="font-medium">快捷入口</span>
+      </template>
+      <div class="flex flex-wrap gap-3">
+        <div
+          v-for="entry in quickEntries"
+          :key="entry.path"
+          class="quick-entry min-w-40"
+          @click="router.push(entry.path)"
+        >
+          <ArtSvgIcon :icon="entry.icon" class="text-xl text-primary" />
+          <span class="text-sm">{{ entry.label }}</span>
+        </div>
+      </div>
+    </ElCard>
+
     <ElRow :gutter="16">
       <!-- ② 公告 feed 主区：点击开详情抽屉，打开即标已读（BR-ANC 与通知共行） -->
       <ElCol :xs="24" :md="15" :lg="16">
@@ -128,6 +146,57 @@
       </ElCol>
 
       <ElCol :xs="24" :md="9" :lg="8">
+        <!-- ②b 工作日历（T30）：月度视图，假期/月报日/申诉日标注；数据源 /masterdata/work-calendar（只读镜像） -->
+        <ElCard shadow="never" class="mb-4 workbench-card">
+          <template #header>
+            <div class="flex items-center justify-between">
+              <span class="font-medium">工作日历</span>
+              <div class="flex items-center gap-2">
+                <ElButton size="small" text @click="shiftMonth(-1)">
+                  <ElIcon><ArrowLeft /></ElIcon>
+                </ElButton>
+                <span class="text-sm font-medium">{{ calMonth }}</span>
+                <ElButton size="small" text @click="shiftMonth(1)">
+                  <ElIcon><ArrowRight /></ElIcon>
+                </ElButton>
+              </div>
+            </div>
+          </template>
+          <div v-loading="calLoading">
+            <ElCalendar v-model="calDate" class="md-cal">
+              <template #header>
+                <span class="text-xs text-gray-400">
+                  图例：<ElTag size="small" type="danger" effect="plain">休</ElTag> 休息日 ·
+                  <ElTag size="small" type="warning" effect="plain">报</ElTag> 月报日 ·
+                  <ElTag size="small" type="primary" effect="plain">申诉</ElTag> 申诉日
+                </span>
+              </template>
+              <template #date-cell="{ data }">
+                <div
+                  class="cal-cell"
+                  :class="{ 'cal-other': !data.isSelected && !inCurrentMonth(data.day) }"
+                >
+                  <div class="cal-day">{{ Number(data.day.slice(8)) }}</div>
+                  <div v-if="inCurrentMonth(data.day)" class="cal-marks">
+                    <ElTag v-if="marks(data.day).holiday" size="small" type="danger" effect="plain"
+                      >休</ElTag
+                    >
+                    <ElTag v-if="marks(data.day).report" size="small" type="warning" effect="plain"
+                      >报</ElTag
+                    >
+                    <ElTag v-if="marks(data.day).appeal" size="small" type="primary" effect="plain"
+                      >申诉</ElTag
+                    >
+                  </div>
+                </div>
+              </template>
+            </ElCalendar>
+            <div v-if="calEmpty && !calLoading" class="py-1 text-center text-xs text-gray-400">
+              该月暂无日历数据（等待同步）
+            </div>
+          </div>
+        </ElCard>
+
         <!-- ③ 通知摘要：未读总数 + 最近 5 条；查看全部 → 通知中心 -->
         <ElCard shadow="never" class="mb-4">
           <template #header>
@@ -181,24 +250,6 @@
             <ElEmpty v-else-if="!ntfLoading" description="暂无通知" :image-size="60" />
           </div>
         </ElCard>
-
-        <!-- ④ 快捷入口：按菜单可见性过滤；无可见项整卡隐藏 -->
-        <ElCard v-if="quickEntries.length" shadow="never">
-          <template #header>
-            <span class="font-medium">快捷入口</span>
-          </template>
-          <div class="grid grid-cols-2 gap-3">
-            <div
-              v-for="entry in quickEntries"
-              :key="entry.path"
-              class="quick-entry"
-              @click="router.push(entry.path)"
-            >
-              <ArtSvgIcon :icon="entry.icon" class="text-xl text-primary" />
-              <span class="text-sm">{{ entry.label }}</span>
-            </div>
-          </div>
-        </ElCard>
       </ElCol>
     </ElRow>
 
@@ -216,7 +267,11 @@
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
+  import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+  import { ElButton, ElIcon, ElTag } from 'element-plus'
+  import { mdRegistryApi, type MdWorkCalendarRow } from '@/api/md'
+
   import { useRouter } from 'vue-router'
   import { storeToRefs } from 'pinia'
   import { iamAuthApi, type IamAccount } from '@/api/iam'
@@ -517,6 +572,68 @@
     loadLatestMaterials()
     refresh()
   })
+
+  // ---------- 工作日历（T30：数据源 /masterdata/work-calendar，只读镜像零推导 BR-MD-009） ----------
+
+  function fmtDate(d: Date): string {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
+  const calLoading = ref(false)
+  const calMonth = ref(fmtDate(new Date()).slice(0, 7)) // YYYY-MM
+  const calEmpty = ref(false)
+  const calMap = ref(new Map<string, MdWorkCalendarRow>())
+
+  /** ElCalendar 受控：展示月随 calMonth；选择日期仅联动月份 */
+  const calDate = computed({
+    get: () =>
+      new Date(Number(calMonth.value.slice(0, 4)), Number(calMonth.value.slice(5, 7)) - 1, 1),
+    set: (v: Date) => {
+      calMonth.value = fmtDate(v).slice(0, 7)
+    }
+  })
+
+  function shiftMonth(delta: number) {
+    const d = new Date(
+      Number(calMonth.value.slice(0, 4)),
+      Number(calMonth.value.slice(5, 7)) - 1 + delta,
+      1
+    )
+    calMonth.value = fmtDate(d).slice(0, 7)
+  }
+
+  function inCurrentMonth(day: string): boolean {
+    return day.slice(0, 7) === calMonth.value
+  }
+
+  function marks(day: string): { holiday: boolean; report: boolean; appeal: boolean } {
+    const r = calMap.value.get(day)
+    return {
+      holiday: !!r?.isHoliday,
+      report: !!r?.isMonthlyReportDate,
+      appeal: !!r?.isSalesAppealDate
+    }
+  }
+
+  async function loadWorkCalendar() {
+    calLoading.value = true
+    try {
+      const [y, m] = calMonth.value.split('-').map(Number)
+      const dateFrom = `${calMonth.value}-01`
+      const dateTo = fmtDate(new Date(y, m, 0)) // 月末
+      const res = await mdRegistryApi.calendar({ dateFrom, dateTo, size: 31 })
+      calMap.value = new Map(res.items.map((r) => [r.theDate, r]))
+      calEmpty.value = res.items.length === 0
+    } finally {
+      calLoading.value = false
+    }
+  }
+
+  watch(calMonth, loadWorkCalendar)
+  onMounted(loadWorkCalendar)
 </script>
 
 <style lang="scss" scoped>
@@ -591,5 +708,43 @@
       background: var(--el-fill-color-light);
       border-color: var(--el-color-primary-light-5);
     }
+  }
+</style>
+
+<style scoped lang="scss">
+  .md-cal :deep(.el-calendar__header) {
+    padding: 8px 12px;
+  }
+
+  .md-cal :deep(.el-calendar-table .el-calendar-day) {
+    height: auto;
+    min-height: 56px;
+    padding: 4px;
+  }
+
+  .cal-cell {
+    min-height: 48px;
+  }
+
+  .cal-day {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .cal-marks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-top: 2px;
+  }
+
+  .cal-marks :deep(.el-tag) {
+    height: 16px;
+    padding: 0 3px;
+    font-size: 10px;
+  }
+
+  .cal-other {
+    opacity: 0.35;
   }
 </style>
