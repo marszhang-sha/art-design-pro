@@ -648,5 +648,147 @@ export const iamEmployeeApi = {
     }>({
       url: `${BASE}/employees/${id}/termination`
     })
+  },
+  // ---- 岗位分配（契约 §3.11，v0.7；EMP-05…11）----
+  /** 分配列表（join 岗位/部门名；主岗优先排序）；TERMINATED 员工只读 */
+  listPositions(employeeId: number) {
+    return request.get<IamEmployeePosition[]>({ url: `${BASE}/employees/${employeeId}/positions` })
+  },
+  /** 分配岗位：重复 409 IAM-4090；isPrimary=true 同事务先降旧主岗（EMP-06） */
+  assignPosition(employeeId: number, payload: { positionId: number; isPrimary?: boolean }) {
+    return request.post({
+      url: `${BASE}/employees/${employeeId}/positions`,
+      params: payload
+    })
+  },
+  /** 设主岗（先降后升）；停用岗位 400 IAM-5008 */
+  setPrimaryPosition(employeeId: number, positionId: number) {
+    return request.post({ url: `${BASE}/employees/${employeeId}/positions/${positionId}/primary` })
+  },
+  /** 解除分配（EMP-08 零主岗合法；审计记 wasPrimary） */
+  removePosition(employeeId: number, positionId: number) {
+    return request.del({ url: `${BASE}/employees/${employeeId}/positions/${positionId}` })
+  }
+}
+
+// ---------- 部门 / 岗位（契约 §3.9/§3.10，v0.7；DEP-01…03 / POS-01…06） ----------
+
+/** 部门树节点（树形全量不分页，children[]；命中过滤时孤儿上浮成林） */
+export interface IamDepartmentNode {
+  id: string
+  code: string
+  name: string
+  parentId: string | null
+  orgNodeId: string
+  attributes: Record<string, unknown> | null
+  status: 'ACTIVE' | 'DISABLED'
+  createdAt?: string
+  updatedAt?: string
+  children: IamDepartmentNode[]
+}
+
+/** 岗位树节点＝汇报线（parentId 上级可跨部门；departmentId 可空＝公司级岗位） */
+export interface IamPositionNode {
+  id: string
+  code: string
+  name: string
+  parentId: string | null
+  departmentId: string | null
+  attributes: Record<string, unknown> | null
+  status: 'ACTIVE' | 'DISABLED'
+  createdAt?: string
+  updatedAt?: string
+  children: IamPositionNode[]
+}
+
+/** 员工岗位分配行（GET /employees/{id}/positions） */
+export interface IamEmployeePosition {
+  id: string
+  positionId: string
+  positionCode: string
+  positionName: string
+  departmentName: string | null
+  isPrimary: boolean
+  createdAt?: string
+}
+
+/** 岗位在岗人员行（GET /positions/{id}/employees；BR-POS-06 预留查询，仅在职） */
+export interface IamPositionEmployee {
+  id: string
+  employeeId: string
+  employeeNo: string
+  name: string
+  isPrimary: boolean
+  assignedAt?: string
+}
+
+export const iamDepartmentApi = {
+  /** 树形全量（过滤 orgNodeId/status/keyword，命中子林成林） */
+  tree(params?: { orgNodeId?: number; status?: 'ACTIVE' | 'DISABLED'; keyword?: string }) {
+    return request.get<IamDepartmentNode[]>({ url: `${BASE}/departments`, params })
+  },
+  get(id: number | string) {
+    return request.get<IamDepartmentNode>({ url: `${BASE}/departments/${id}` })
+  },
+  /** 创建：挂靠三口（BE 须 ACTIVE）；同父重名/编码冲突 409 IAM-4004 */
+  create(payload: {
+    code: string
+    name: string
+    orgNodeId: number
+    parentId?: number
+    attributes?: Record<string, unknown>
+  }) {
+    return request.post<IamDepartmentNode>({ url: `${BASE}/departments`, params: payload })
+  },
+  /** 仅 name/attributes（parentId/orgNodeId 出现即 400 IAM-4001，DEP-02） */
+  update(id: number | string, payload: { name: string; attributes?: Record<string, unknown> }) {
+    return request.patch({ url: `${BASE}/departments/${id}`, params: payload })
+  },
+  /** 软停用：沿祖先链冻结新建子部门/岗位/新分配，存量不动；重复停用 409 IAM-5005 */
+  disable(id: number | string) {
+    return request.post({ url: `${BASE}/departments/${id}/disable` })
+  },
+  /** 重复启用 409 IAM-5005 */
+  enable(id: number | string) {
+    return request.post({ url: `${BASE}/departments/${id}/enable` })
+  }
+}
+
+export const iamPositionApi = {
+  /** 汇报线树形全量（过滤 departmentId/status/keyword，父不在结果集则子岗上浮成林） */
+  tree(params?: { departmentId?: number; status?: 'ACTIVE' | 'DISABLED'; keyword?: string }) {
+    return request.get<IamPositionNode[]>({ url: `${BASE}/positions`, params })
+  },
+  get(id: number | string) {
+    return request.get<IamPositionNode>({ url: `${BASE}/positions/${id}` })
+  },
+  /** 按岗位查在职人员（BR-POS-06 预留查询；审批域零改造接入） */
+  listEmployees(id: number | string) {
+    return request.get<IamPositionEmployee[]>({ url: `${BASE}/positions/${id}/employees` })
+  },
+  /** 创建：departmentId 可空＝公司级岗位（裁定 A）；parentId 可跨部门（POS-02） */
+  create(payload: {
+    code: string
+    name: string
+    departmentId?: number | null
+    parentId?: number
+    attributes?: Record<string, unknown>
+  }) {
+    return request.post<IamPositionNode>({ url: `${BASE}/positions`, params: payload })
+  },
+  /** name/attributes/parentId 任意子集；parentId 走 POS-03 成环校验（400 IAM-5009）；departmentId 出现即 400（POS-05） */
+  update(
+    id: number | string,
+    payload: { name?: string; parentId?: number; attributes?: Record<string, unknown> }
+  ) {
+    return request.patch<IamPositionNode>({ url: `${BASE}/positions/${id}`, params: payload })
+  },
+  /** 软停用：在岗分配保留；重复停用 409 IAM-5007 */
+  disable(id: number | string) {
+    return request.post({ url: `${BASE}/positions/${id}/disable` })
+  },
+  /** 重复启用 409 IAM-5007 */
+  enable(id: number | string) {
+    return request.post({ url: `${BASE}/positions/${id}/enable` })
   }
 }

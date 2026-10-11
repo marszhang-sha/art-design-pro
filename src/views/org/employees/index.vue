@@ -113,11 +113,123 @@
         <ElButton type="primary" :loading="submitting" @click="submitForm">保存</ElButton>
       </template>
     </ElDrawer>
+
+    <!-- 岗位分配 Drawer（UI-IAM-015 配套；EMP-05…11；契约 §3.11） -->
+    <ElDrawer
+      v-model="assignDrawerVisible"
+      :title="`岗位分配：${assignEmployee?.name ?? ''}`"
+      size="560px"
+    >
+      <template v-if="assignEmployee">
+        <!-- 组织挂靠 vs 主岗部门并列（EMP-09 独立维护，可不一致不告警） -->
+        <div class="mb-3 flex items-stretch gap-2">
+          <ElCard shadow="never" class="flex-1">
+            <div class="text-xs text-gray-400">组织挂靠（orgNodeId）</div>
+            <div class="mt-1 text-sm font-medium">
+              {{ orgNameMap[assignEmployee.orgNodeId] ?? `#${assignEmployee.orgNodeId}` }}
+            </div>
+          </ElCard>
+          <ElCard shadow="never" class="flex-1">
+            <div class="text-xs text-gray-400">
+              主岗部门
+              <ElTooltip
+                v-if="primaryDeptMismatch"
+                content="与组织挂靠不一致（EMP-09：两者独立维护、互不强制）"
+                placement="top"
+              >
+                <ElTag size="small" type="warning" class="ml-1">不一致</ElTag>
+              </ElTooltip>
+            </div>
+            <div class="mt-1 text-sm font-medium">
+              {{ primaryDeptName ?? (empPositions.length ? '—（零主岗）' : '未分配岗位') }}
+            </div>
+          </ElCard>
+        </div>
+
+        <ElAlert
+          v-if="assignEmployee.employmentStatus === 'TERMINATED'"
+          title="员工已离职：分配表只读（EMP-10 历史留存）"
+          type="info"
+          :closable="false"
+          show-icon
+          class="mb-3"
+        />
+
+        <!-- 已岗列表（Drawer 内非主列表：豁免三件套，仍守高度约束） -->
+        <ElTable
+          :data="empPositions"
+          v-loading="assignLoading"
+          size="small"
+          empty-text="暂无岗位分配"
+        >
+          <ElTableColumn
+            prop="positionCode"
+            label="岗位编码"
+            min-width="130"
+            show-overflow-tooltip
+          />
+          <ElTableColumn
+            prop="positionName"
+            label="岗位名称"
+            min-width="120"
+            show-overflow-tooltip
+          />
+          <ElTableColumn prop="departmentName" label="部门" min-width="110" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.departmentName ?? '—（公司级）' }}</template>
+          </ElTableColumn>
+          <ElTableColumn label="主岗" width="70">
+            <template #default="{ row }">
+              <ElTag v-if="row.isPrimary" type="success" size="small">主岗</ElTag>
+            </template>
+          </ElTableColumn>
+          <ElTableColumn label="操作" width="130" fixed="right">
+            <template #default="{ row }">
+              <ElButton
+                link
+                type="primary"
+                size="small"
+                :disabled="readonlyAssign || row.isPrimary"
+                @click="onSetPrimary(row)"
+              >
+                设主岗
+              </ElButton>
+              <ElButton
+                link
+                type="danger"
+                size="small"
+                :disabled="readonlyAssign"
+                @click="onRemovePosition(row)"
+              >
+                解除
+              </ElButton>
+            </template>
+          </ElTableColumn>
+        </ElTable>
+
+        <!-- 添加岗位（跨部门 TreeSelect，仅 ACTIVE 岗位） -->
+        <div v-if="!readonlyAssign" class="mt-4 flex items-center gap-2">
+          <ElTreeSelect
+            v-model="assignPositionId"
+            :data="assignPickTree"
+            node-key="id"
+            check-strictly
+            filterable
+            :props="{ label: 'label', children: 'children' }"
+            placeholder="选择岗位（跨部门可选；仅启用岗位）"
+            class="flex-1"
+          />
+          <ElCheckbox v-model="assignAsPrimary">设为主岗</ElCheckbox>
+          <ElButton type="primary" :loading="assignSubmitting" @click="onAssignPosition">
+            添加
+          </ElButton>
+        </div>
+      </template>
+    </ElDrawer>
   </div>
 </template>
 
 <script setup lang="ts">
-  import { h, onMounted, ref } from 'vue'
+  import { computed, h, onMounted, ref } from 'vue'
   import { ElMessage, ElMessageBox, ElTag, type FormInstance, type FormRules } from 'element-plus'
   import ArtButtonMore, {
     type ButtonMoreItem
@@ -126,9 +238,12 @@
   import {
     iamEmployeeApi,
     iamOrgApi,
+    iamPositionApi,
     type IamEmployee,
     type IamEmployeeListParams,
+    type IamEmployeePosition,
     type IamOrgNode,
+    type IamPositionNode,
     type IamSortOrder
   } from '@/api/iam'
   import { toPaginated } from '@/views/iam/table'
@@ -284,7 +399,7 @@
     }
   })
 
-  /** TERMINATED 终态：编辑/离职置灰（ArtButtonMore 支持 per-item disabled + auth） */
+  /** TERMINATED 终态：编辑/离职/岗位分配置灰（ArtButtonMore 支持 per-item disabled + auth） */
   function operationList(row: IamEmployee): ButtonMoreItem[] {
     return [
       {
@@ -292,6 +407,13 @@
         label: '编辑',
         icon: 'ri:edit-line',
         auth: 'system:employee:update',
+        disabled: row.employmentStatus === 'TERMINATED'
+      },
+      {
+        key: 'positions',
+        label: '岗位分配',
+        icon: 'ri:sitemap-line',
+        auth: 'system:employee:assign-position',
         disabled: row.employmentStatus === 'TERMINATED'
       },
       {
@@ -307,6 +429,7 @@
 
   function buttonMoreClick(item: ButtonMoreItem, row: IamEmployee) {
     if (item.key === 'edit') openEdit(row)
+    else if (item.key === 'positions') openAssignDrawer(row)
     else if (item.key === 'terminate') onTerminate(row)
   }
 
@@ -462,5 +585,115 @@
     } finally {
       submitting.value = false
     }
+  }
+
+  // ---------- 岗位分配 Drawer（契约 §3.11；EMP-05…11） ----------
+
+  const assignDrawerVisible = ref(false)
+  const assignEmployee = ref<IamEmployee | null>(null)
+  const empPositions = ref<IamEmployeePosition[]>([])
+  const assignLoading = ref(false)
+  const assignSubmitting = ref(false)
+  const assignPositionId = ref<string | undefined>(undefined)
+  const assignAsPrimary = ref(false)
+
+  /** TERMINATED 只读（EMP-10）：设主岗/解除/添加全部冻结 */
+  const readonlyAssign = computed(() => assignEmployee.value?.employmentStatus === 'TERMINATED')
+
+  const primaryDeptName = computed(
+    () => empPositions.value.find((p) => p.isPrimary)?.departmentName ?? null
+  )
+
+  /** EMP-09：组织挂靠与主岗部门独立维护——两者都有且不一致时标注（不告警） */
+  const primaryDeptMismatch = computed(() => {
+    const e = assignEmployee.value
+    const dept = primaryDeptName.value
+    if (!e || !dept) return false
+    const orgName = orgNameMap.value[e.orgNodeId]
+    return orgName !== undefined && !orgName.endsWith(dept) && orgName !== dept
+  })
+
+  interface AssignPickNode {
+    id: string
+    label: string
+    disabled?: boolean
+    children?: AssignPickNode[]
+  }
+
+  const assignPickTree = ref<AssignPickNode[]>([])
+
+  function toAssignPickNodes(nodes: IamPositionNode[]): AssignPickNode[] {
+    return nodes.map((n) => ({
+      id: n.id,
+      label: `${n.name}（${n.code}）`,
+      disabled: n.status === 'DISABLED',
+      children: n.children?.length ? toAssignPickNodes(n.children) : undefined
+    }))
+  }
+
+  async function loadAssignPickTree() {
+    const tree = await iamPositionApi.tree({ status: 'ACTIVE' })
+    assignPickTree.value = toAssignPickNodes(tree)
+  }
+
+  async function loadEmpPositions() {
+    if (!assignEmployee.value) return
+    assignLoading.value = true
+    try {
+      empPositions.value = await iamEmployeeApi.listPositions(assignEmployee.value.id)
+    } finally {
+      assignLoading.value = false
+    }
+  }
+
+  function openAssignDrawer(row: IamEmployee) {
+    assignEmployee.value = row
+    assignPositionId.value = undefined
+    assignAsPrimary.value = false
+    assignDrawerVisible.value = true
+    loadEmpPositions()
+    loadAssignPickTree()
+  }
+
+  async function onAssignPosition() {
+    if (!assignEmployee.value || !assignPositionId.value) {
+      ElMessage.warning('请先选择岗位')
+      return
+    }
+    assignSubmitting.value = true
+    try {
+      await iamEmployeeApi.assignPosition(assignEmployee.value.id, {
+        positionId: Number(assignPositionId.value),
+        isPrimary: assignAsPrimary.value
+      })
+      ElMessage.success(assignAsPrimary.value ? '已添加并设为主岗' : '已添加')
+      assignPositionId.value = undefined
+      assignAsPrimary.value = false
+      await loadEmpPositions()
+    } finally {
+      assignSubmitting.value = false
+    }
+  }
+
+  async function onSetPrimary(row: IamEmployeePosition) {
+    if (!assignEmployee.value) return
+    await iamEmployeeApi.setPrimaryPosition(assignEmployee.value.id, Number(row.positionId))
+    ElMessage.success(`已将「${row.positionName}」设为主岗（原主岗自动降级）`)
+    await loadEmpPositions()
+  }
+
+  function onRemovePosition(row: IamEmployeePosition) {
+    if (!assignEmployee.value) return
+    ElMessageBox.confirm(
+      `解除「${row.positionName}」分配？${row.isPrimary ? '解除主岗后员工零主岗合法（EMP-08），不自动晋升他岗。' : ''}`,
+      '解除岗位分配',
+      { type: 'warning' }
+    )
+      .then(async () => {
+        await iamEmployeeApi.removePosition(assignEmployee.value!.id, Number(row.positionId))
+        ElMessage.success('已解除')
+        await loadEmpPositions()
+      })
+      .catch(() => undefined)
   }
 </script>
