@@ -1,6 +1,7 @@
 <template>
   <!-- UI-MD-005 辖区组织（/md/territories）：月快照（YYYYMM+TerrCode）；缺省=最新已同步月份（BR-MD-010）。
-       T29 demo：动态查询条件——条件池由列 search 元数据派生，用户自由增删（仅本页，其余页不切换）。 -->
+       T29 demo：动态查询条件——条件池由列 search 元数据派生，用户自由增删（仅本页，其余页不切换）。
+       树表：整月全量一次取全（单月约 27 行小表，不分页），客户端按 upperTerrCode 构树按层级展示。 -->
   <div class="art-full-height">
     <ArtDynamicSearchBar
       v-show="showSearchBar"
@@ -23,14 +24,15 @@
         :loading="loading"
         @refresh="getData"
       />
+      <!-- 树表：全量小表不分页（frontend.md §3.3）；row-key/tree-props/default-expand-all 透传 ArtTable（§6） -->
       <ArtTable
         :loading="loading"
-        :data="records"
+        :data="treeData"
         :columns="columns"
-        :pagination="pagination"
-        :empty-text="months.length ? '该月无匹配数据' : '暂无数据（等待同步）'"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
+        row-key="terrCode"
+        :tree-props="{ children: 'children' }"
+        default-expand-all
+        :empty-text="months.length ? '当前月份暂无辖区数据' : '暂无数据（等待同步）'"
       />
     </ElCard>
   </div>
@@ -50,7 +52,8 @@
 
   const showSearchBar = ref(true)
 
-  const SIZE = 20
+  /** 整月全量加载（frontend.md §3.3 全量小表不分页）：单月约 27 行，size 取大值一次取全 */
+  const FULL_MONTH_SIZE = 100 // BE 分页上限 le=100（契约 §2）；单月约 27 行，一页即全量
   const LEVEL_OPTIONS = ['2-SD', '3-RM', '4-DM']
 
   const months = ref<string[]>([])
@@ -195,19 +198,66 @@
     columnChecks,
     data: records,
     loading,
-    pagination,
     getData,
-    replaceSearchParams,
-    handleSizeChange,
-    handleCurrentChange
+    replaceSearchParams
   } = useTable({
     core: {
       apiFn: fetchTerritories,
-      apiParams: { page: 1, size: SIZE },
+      apiParams: { page: 1, size: FULL_MONTH_SIZE },
       paginationKey: { current: 'page', size: 'size' },
       columnsFactory: () => columnsMeta
     }
   })
+
+  // ── 树构建（客户端）：terrCode 建索引，children 由 upperTerrCode 指向父行；
+  //    根＝上码为空串／上码在本月行集缺失／祖先链成环（含自指）。月份切换重查后 records 变化即重建。 ──
+
+  /** 树节点：保留原行字段，另挂 children 数组 */
+  interface TerritoryTreeNode extends MdTerritoryRow {
+    children?: TerritoryTreeNode[]
+  }
+
+  function buildTerritoryTree(rows: MdTerritoryRow[]): TerritoryTreeNode[] {
+    const byCode = new Map<string, TerritoryTreeNode>()
+    const duplicated: TerritoryTreeNode[] = []
+    for (const row of rows) {
+      const node: TerritoryTreeNode = { ...row, children: [] }
+      // 同月同码脏数据（契约上月快照键=YYYYMM+TerrCode，不应出现）：首行入索引，重复行不丢弃——直接作根展示
+      if (byCode.has(row.terrCode)) duplicated.push(node)
+      else byCode.set(row.terrCode, node)
+    }
+
+    /** 沿上码链查脏环（visited 防死循环）；触达空上码/缺失父即链终止＝无环 */
+    const isCyclic = (node: TerritoryTreeNode): boolean => {
+      const visited = new Set<string>()
+      let current: TerritoryTreeNode | undefined = node
+      while (current) {
+        if (visited.has(current.terrCode)) return true
+        visited.add(current.terrCode)
+        current = current.upperTerrCode ? byCode.get(current.upperTerrCode) : undefined
+      }
+      return false
+    }
+
+    const roots: TerritoryTreeNode[] = []
+    for (const node of byCode.values()) {
+      const parent = node.upperTerrCode ? byCode.get(node.upperTerrCode) : undefined
+      if (parent && !isCyclic(node)) {
+        parent.children ??= []
+        parent.children.push(node)
+      } else {
+        roots.push(node)
+      }
+    }
+
+    // 叶子行移除空 children（ElTable 以 children 存在性渲染展开箭头）
+    for (const node of byCode.values()) {
+      if (node.children && node.children.length === 0) delete node.children
+    }
+    return [...roots, ...duplicated]
+  }
+
+  const treeData = computed<TerritoryTreeNode[]>(() => buildTerritoryTree(records.value))
 
   function handleSearch() {
     replaceSearchParams(dropEmpty({ ...searchForm.value }))

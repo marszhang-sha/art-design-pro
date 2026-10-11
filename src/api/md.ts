@@ -207,6 +207,7 @@ export const mdRegistryApi = {
     size?: number
     level?: 'PROVINCE' | 'CITY' | 'COUNTY'
     parentCode?: string
+    name?: string
   }) {
     return request.get<IamPage<MdRegionRow>>({ url: `${BASE}/masterdata/regions`, params })
   },

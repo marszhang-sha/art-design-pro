@@ -45,8 +45,14 @@
 
   const SIZE = 20
 
-  const searchForm = ref<{ level?: 'PROVINCE' | 'CITY' | 'COUNTY' }>({})
+  const searchForm = ref<{ level?: 'PROVINCE' | 'CITY' | 'COUNTY'; name?: string }>({})
   const searchItems = [
+    {
+      label: '名称',
+      key: 'name',
+      type: 'input',
+      props: { placeholder: '名称模糊查询', clearable: true }
+    },
     {
       label: '级别',
       key: 'level',
@@ -66,6 +72,7 @@
   function fetchRegions(params: Record<string, unknown>) {
     const clean: Record<string, unknown> = {}
     if (params.level) clean.level = params.level
+    if (params.name) clean.name = params.name
     if (params.page !== undefined) clean.page = params.page
     if (params.size !== undefined) clean.size = params.size
     return mdRegistryApi.regions(clean).then(toPaginated)
