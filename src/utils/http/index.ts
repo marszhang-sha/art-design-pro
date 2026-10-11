@@ -236,9 +236,9 @@ function delay(ms: number) {
 
 /** 请求函数 */
 async function request<T = any>(config: ExtendedAxiosRequestConfig): Promise<T> {
-  // POST | PUT 参数自动填充
+  // POST | PUT | PATCH 参数自动填充（PATCH 原遗漏 → payload 误入 query string、body 为空）
   if (
-    ['POST', 'PUT'].includes(config.method?.toUpperCase() || '') &&
+    ['POST', 'PUT', 'PATCH'].includes(config.method?.toUpperCase() || '') &&
     config.params &&
     !config.data
   ) {

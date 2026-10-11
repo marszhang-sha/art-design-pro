@@ -127,7 +127,6 @@ export function handleError(error: AxiosError<ErrorResponse>): never {
   }
 
   const statusCode = error.response?.status
-  const errorMessage = error.response?.data?.msg || error.message
   const requestConfig = error.config
 
   // 处理网络错误
@@ -138,11 +137,24 @@ export function handleError(error: AxiosError<ErrorResponse>): never {
     })
   }
 
-  // 处理 HTTP 状态码错误
-  const message = statusCode
-    ? getErrorMessage(statusCode)
-    : errorMessage || $t('httpMsg.requestFailed')
-  throw new HttpError(message, statusCode || ApiStatus.error, {
+  // 服务端明确消息优先：IAM RFC 7807 载荷（detail/code；FastAPI 校验错误的 detail 为数组）
+  // 或框架信封（msg）；均缺失时回退状态码文案映射
+  const data = error.response.data as
+    | (ErrorResponse & { detail?: string | { msg?: string }[]; code?: string })
+    | undefined
+  let detailText = ''
+  if (typeof data?.detail === 'string') {
+    detailText = data.detail
+  } else if (Array.isArray(data?.detail)) {
+    detailText = data.detail
+      .map((d) => d?.msg ?? '')
+      .filter(Boolean)
+      .join('；')
+  }
+  const serverMessage = data?.msg || detailText
+  const message =
+    serverMessage || (statusCode ? getErrorMessage(statusCode) : $t('httpMsg.requestFailed'))
+  throw new HttpError(message, data?.code ?? statusCode ?? ApiStatus.error, {
     data: error.response.data,
     url: requestConfig?.url,
     method: requestConfig?.method?.toUpperCase()
