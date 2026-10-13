@@ -1,0 +1,121 @@
+{
+  "source": "https://v.wjx.cn/vm/t0byQI5.aspx",
+  "capturedOn": "2026-10-04",
+  "title": "希维她代理商合作意向调查问卷",
+  "questions": [
+    {
+      "number": 1,
+      "label": "所在省份",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 2,
+      "label": "所在城市",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 3,
+      "label": "代理商公司",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 4,
+      "label": "代理商负责人",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 5,
+      "label": "公司规模（年销售额）",
+      "required": true,
+      "options": ["500万以下", "500万-1000万", "1000万-5000万", "5000万-1亿", "1亿以上"]
+    },
+    {
+      "number": 6,
+      "label": "自营团队人数",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 7,
+      "label": "招商团队人数",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 8,
+      "label": "经营品种",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 9,
+      "label": "覆盖城市（县以上）",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 10,
+      "label": "覆盖科室",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 11,
+      "label": "已开发医院家数",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 12,
+      "label": "优势医院名称（可填多家）",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 13,
+      "label": "优势妇科领域专家（姓名及单位，可填多位）",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 14,
+      "label": "妇科&HPV领域每年销售金额",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 15,
+      "label": "2025年销售额",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 16,
+      "label": "希维她合约量（单位：盒）",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 17,
+      "label": "其他-有无产品经理（讲师）",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 18,
+      "label": "其他-意向合作区域",
+      "required": true,
+      "options": []
+    },
+    {
+      "number": 19,
+      "label": "联系方式-邮箱或手机",
+      "required": true,
+      "options": []
+    }
+  ]
+}

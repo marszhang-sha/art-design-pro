@@ -43,6 +43,13 @@ export const staticRoutes: AppRouteRecordRaw[] = [
     meta: { title: '修改登录密码', isHideTab: true }
   },
   {
+    // 合作意向问卷（原型移植）：免登录公开收集，提交写入意向池（localStorage）
+    path: '/cso/questionnaire',
+    name: 'CsoQuestionnaire',
+    component: () => import('@views/cso/questionnaire/index.vue'),
+    meta: { title: '合作意向问卷', isHideTab: true }
+  },
+  {
     path: '/403',
     name: 'Exception403',
     component: () => import('@views/exception/403/index.vue'),
